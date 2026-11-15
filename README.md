@@ -3,32 +3,57 @@
 Desktop tool for Path of Exile 2 that knows your character and the build you follow, and answers one question
 for an item you just found: *is it better than what I wear, and does it fit my build?*
 
-Status: **Phase 0 (feasibility) – done.** See results below.
+Status: **Phase 1 (character overview) – done.** Next: phase 2, item check per hotkey.
 
 > This product isn't affiliated with or endorsed by Grinding Gear Games in any way.
 > Uses [Path of Building PoE2](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2) (MIT, © David Gowor)
 > as its calculation engine, unchanged, as a git submodule.
 
-## Layout
+## What it does (phase 1)
 
-```
-vendor/PathOfBuilding-PoE2   PoB PoE2, unchanged (git submodule)
-spike/pob-host.mjs           Runs PoB headless in Node: loads PoB's own LuaJIT (runtime/lua51.dll) via koffi,
-                             JSON lines on stdin/stdout, PoB console output on stderr
-spike/bridge.lua             Lua side: boots HeadlessWrapper.lua, commands "load" and "compare"
-spike/run.mjs                Phase 0 test: spawns the host, loads a build code, checks items, prints timings
-spike/fixtures/deadeye.code  Public build code (poe.ninja) used for the test
-```
+- **Character overview:** equipped items per slot with their modifiers, life / energy shield / mana / spirit,
+  effective HP and max hit per damage type, evasion, armour, deflect, movement speed, attributes vs. requirements.
+- **Resistances** with their actual cap (75 % or raised by max-resistance modifiers) and a warning when below it.
+- **Damage per skill** for every enabled skill group, each calculated as if it were the main skill (the number PoB
+  shows when you select it), main skill highlighted.
+- **Build source:**
+  - **poe.ninja** (recommended): paste your character link (profile or builds page) once, then *Refresh* loads the latest state with one
+    click. Requires a public profile; the state is as fresh as poe.ninja's last check, which is shown.
+  - **Path of Building code:** *Paste build code* reads the clipboard once, on click – works with private profiles.
+- Shows how old the loaded state is and suggests refreshing after three days.
 
-## Running the spike
+Nothing is sent to the game, no hotkeys yet, the clipboard is never read in the background. PoB's OAuth client id is
+never used; there are no requests to GGG at all.
+
+## Running from source
 
 ```bash
 git submodule update --init --depth 1
 npm install
-npm run spike
-# or with your own build code and item texts (Ctrl+C in game):
-node spike/run.mjs my-build.code item1.txt item2.txt
+npm start
 ```
+
+Other scripts: `npm test` (vitest), `npm run typecheck`, `npm run engine-check` (engine without window: load a
+build code, print stats, compare items). Invisible UI test (hidden window, own profile, fixture clipboard):
+
+```bash
+npm run build
+npx electron scripts/run-hidden.cjs scripts/ui-check.cjs <output folder>
+```
+
+## Layout
+
+```
+vendor/PathOfBuilding-PoE2   PoB PoE2, unchanged (git submodule)
+src/engine/host.ts           Engine process: loads PoB's own LuaJIT (runtime/lua51.dll) via koffi; JSON lines on
+                             stdin/stdout. Started by the app as Electron in Node mode – no extra runtime.
+src/engine/bridge.lua        Lua side: boots PoB headless; commands "load", "overview", "compare"
+src/main/                    Electron main process: window, storage, engine client, poe.ninja refresh
+src/shared/                  Build code decoding, poe.ninja lookup, shared types
+src/renderer/                Character and build source pages
+```
+
+Settings and the last build are stored in `%APPDATA%\poe2-build-companion\companion.json`.
 
 ## Phase 0 results (November 2026, PoB PoE2 v0.23.1)
 

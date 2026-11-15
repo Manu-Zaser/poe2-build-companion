@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self'" />
+  <title>PoE2 Build Companion</title>
+  <link rel="stylesheet" href="base.css" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 2 L28 9 V23 L16 30 L4 23 V9 Z" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M16 8v16M10 12l6-4 6 4M10 20l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".55" />
+        <circle cx="16" cy="16" r="2.6" fill="currentColor" />
+      </svg>
+      <div class="brand-text">
+        <span class="brand-name">Build Companion</span>
+        <span class="brand-sub">for Path of Exile 2</span>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="Pages">
+      <button class="nav-item active" data-page="character">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5" /><path d="M5 20c.8-4 3.6-6 7-6s6.2 2 7 6" /></svg>
+        <span>Character</span>
+      </button>
+      <button class="nav-item" data-page="source">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5" /></svg>
+        <span>Build source</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="engine-state" id="engine-state"><i></i><span>Starting Path of Building…</span></div>
+      <p class="fineprint">
+        Calculations by Path of Building (MIT). Values are PoB calculations, not measurements in game.
+        Not affiliated with or endorsed by Grinding Gear Games.
+      </p>
+    </div>
+  </aside>
+
+  <div class="content">
+    <header class="page-head">
+      <div>
+        <h1 id="page-title">Character</h1>
+        <p id="page-sub">Your gear, defences and damage at a glance</p>
+      </div>
+    </header>
+
+    <main>
+      <p class="banner" id="msg" hidden></p>
+
+      <!-- CHARACTER -->
+      <section class="page active" data-page="character" data-title="Character" data-sub="Your gear, defences and damage at a glance">
+        <div class="card pad empty-state" id="empty" hidden>
+          <h2>No build loaded yet</h2>
+          <p>Link your character on poe.ninja – then one click on <b>Refresh</b> keeps it up to date. Or paste a Path of Building code.</p>
+          <div class="row">
+            <button class="btn primary" data-goto="source">Set up build source</button>
+            <button class="btn" id="empty-paste">Paste build code</button>
+          </div>
+        </div>
+
+        <div id="char" hidden>
+          <div class="hero card pad">
+            <div class="hero-main">
+              <div class="hero-title" id="hero-title"></div>
+              <div class="hero-sub" id="hero-sub"></div>
+            </div>
+            <div class="hero-side">
+              <div class="freshness" id="freshness"></div>
+              <div class="row">
+                <button class="btn sm" id="hero-paste" title="Read a Path of Building code from the clipboard">Paste code</button>
+                <button class="btn sm primary" id="hero-refresh" hidden>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
+                  <span>Refresh from poe.ninja</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="kpis" id="kpis"></div>
+
+          <div class="char-layout">
+            <div class="gear" id="gear"></div>
+
+            <div class="side">
+              <div class="card pad">
+                <div class="card-head"><h2>Resistances</h2><span class="card-note" id="res-note"></span></div>
+                <div class="res-list" id="res-list"></div>
+              </div>
+
+              <div class="card pad">
+                <div class="card-head"><h2>Damage</h2><span class="card-note" id="dps-note"></span></div>
+                <ul class="skill-list" id="skills"></ul>
+              </div>
+
+              <div class="card pad">
+                <div class="card-head"><h2>Defences</h2></div>
+                <dl class="totals" id="defences"></dl>
+              </div>
+
+              <div class="card pad">
+                <div class="card-head"><h2>Attributes</h2></div>
+                <dl class="totals" id="attributes"></dl>
+              </div>
+            </div>
+          </div>
+
+          <details class="card pad jewels" id="jewels-card">
+            <summary><h2>Jewels</h2><span class="card-note" id="jewel-count"></span></summary>
+            <div class="jewel-grid" id="jewels"></div>
+          </details>
+        </div>
+      </section>
+
+      <!-- BUILD SOURCE -->
+      <section class="page" data-page="source" data-title="Build source" data-sub="Where your character comes from">
+        <div class="card pad">
+          <div class="card-head"><h2>poe.ninja</h2><span class="badge">recommended</span></div>
+          <p class="text">
+            If your profile is public, poe.ninja lists your character together with its Path of Building code.
+            Open your character on <b>poe.ninja → Builds</b>, copy the address from the browser and paste it here.
+            After that, <b>Refresh</b> loads the latest state with one click.
+          </p>
+          <div class="link-row">
+            <input type="text" id="ninja-link" placeholder="https://poe.ninja/poe2/profile/Account-1234/league/character/CharacterName" spellcheck="false" />
+            <button class="btn primary" id="ninja-save">Connect</button>
+          </div>
+          <div class="ninja-current" id="ninja-current" hidden>
+            <div>
+              <div class="ninja-name" id="ninja-name"></div>
+              <div class="card-note" id="ninja-meta"></div>
+            </div>
+            <div class="row">
+              <button class="btn sm" id="ninja-open">Open on poe.ninja</button>
+              <button class="btn sm primary" id="ninja-refresh">Refresh</button>
+              <button class="btn sm ghost" id="ninja-clear">Disconnect</button>
+            </div>
+          </div>
+          <p class="section-hint">
+            poe.ninja updates characters on its own schedule, usually every few hours. Changes you made in the last
+            hours may not be there yet.
+          </p>
+        </div>
+
+        <div class="card pad">
+          <div class="card-head"><h2>Path of Building code</h2></div>
+          <p class="text">
+            Works always, also with a private profile: in Path of Building 2 import your character
+            (<b>Import/Export Build → Import from Path of Exile</b>), then <b>Export → Generate → Copy</b> and click here.
+            The clipboard is read once, only when you click.
+          </p>
+          <div class="row"><button class="btn" id="source-paste">Paste build code</button></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
