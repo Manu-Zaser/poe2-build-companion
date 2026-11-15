@@ -1,4 +1,4 @@
-import type { NinjaCharacter } from './types';
+import type { ItemIcon, NinjaCharacter } from './types';
 
 /**
  * poe.ninja character lookup. poe.ninja publishes characters with public profiles, including the
@@ -50,6 +50,33 @@ export interface NinjaBuild {
   updatedAt?: string;
   level?: number;
   className?: string;
+  /** League display name, e.g. "Forbidden Rites". */
+  leagueName?: string;
+  /** Item pictures (only images on GGG's CDN are kept). */
+  icons?: ItemIcon[];
+}
+
+const ICON_HOST = 'https://web.poecdn.com/';
+
+/** Item pictures from poe.ninja's profile data (equipment, flasks/charms, jewels). */
+export function iconsFromModel(model: Record<string, unknown>): ItemIcon[] {
+  const icons: ItemIcon[] = [];
+  for (const key of ['items', 'flasks', 'jewels']) {
+    const list = model[key];
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      const d = (entry as { itemData?: Record<string, unknown> })?.itemData;
+      if (!d) continue;
+      const url = str(d.icon);
+      const typeLine = str(d.typeLine);
+      const inventoryId = str(d.inventoryId);
+      if (!url || !url.startsWith(ICON_HOST) || !typeLine || !inventoryId) continue;
+      const name = str(d.name);
+      const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+      icons.push({ name: name ? `${name}, ${typeLine}` : typeLine, inventoryId, x: num(d.x), w: num(d.w), h: num(d.h), url });
+    }
+  }
+  return icons;
 }
 
 type FetchLike = (
@@ -96,5 +123,7 @@ export async function fetchNinjaBuild(c: NinjaCharacter, userAgent: string, fetc
     updatedAt: str(meta.updatedUtc),
     level: typeof meta.level === 'number' ? meta.level : undefined,
     className: str(meta.class),
+    leagueName: str(meta.league),
+    ...(Object.keys(meta).length ? { icons: iconsFromModel(meta) } : {}),
   };
 }

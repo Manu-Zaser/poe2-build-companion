@@ -15,6 +15,8 @@ export interface ItemInfo {
   base: string;
   rarity: Rarity;
   corrupted: boolean;
+  quality?: number;
+  itemLevel?: number;
   mods: ModLine[];
   /** Item text in PoB's format. */
   raw: string;
@@ -24,11 +26,54 @@ export interface ItemInfo {
 export type Stats = Partial<Record<string, number>>;
 
 export interface SkillDps {
+  /** Index of the skill group in PoB's Skills tab. */
+  group: number;
   name: string;
   part?: string;
   dps: number;
+  /** Speed, CritChance, CritMultiplier, HitChance, ProjectileCount, AreaOfEffectRadiusMetres, ... */
+  stats: Stats;
   /** The build's selected main skill. */
   main?: boolean;
+}
+
+export interface Gem {
+  name: string;
+  level?: number;
+  quality?: number;
+  support: boolean;
+  enabled: boolean;
+}
+
+export interface GemGroup {
+  index: number;
+  label: string | null;
+  slot: string | null;
+  /** Granted by an item, not socketed by the player. */
+  fromItem?: boolean;
+  enabled: boolean;
+  main?: boolean;
+  gems: Gem[];
+}
+
+export interface PassiveNode {
+  name: string;
+  kind: 'ascendancy' | 'keystone';
+  lines: string[];
+}
+
+export interface Passives {
+  points: number;
+  weaponSetPoints: number;
+  ascendancyPoints: number;
+  nodes: PassiveNode[];
+}
+
+export interface GearSlot {
+  slot: string;
+  /** Weapon set (1 or 2) for weapon slots, null for all others. */
+  set: number | null;
+  item: ItemInfo | null;
 }
 
 export interface Overview {
@@ -39,7 +84,9 @@ export interface Overview {
   weaponSet: number;
   stats: Stats;
   skills: SkillDps[];
-  gear: { slot: string; item: ItemInfo | null }[];
+  gemGroups: GemGroup[];
+  passives: Passives;
+  gear: GearSlot[];
   jewels: { slot: string; item: ItemInfo }[];
 }
 
@@ -68,6 +115,24 @@ export interface StoredBuild {
   importedAt: string;
   /** ISO time poe.ninja last checked the character (only for poe.ninja). */
   snapshotAt?: string;
+  /** League display name from poe.ninja, e.g. "Forbidden Rites". */
+  leagueName?: string;
+  /** Item pictures from the poe.ninja profile (only for poe.ninja). */
+  icons?: ItemIcon[];
+}
+
+export interface ItemIcon {
+  /** "Title, Base" for rare/unique items, the full name otherwise – matches PoB's item name. */
+  name: string;
+  /** Game inventory id: Weapon, Offhand, Weapon2, Offhand2, Helm, BodyArmour, Gloves, Boots, Amulet, Ring, Ring2, Belt, Flask. */
+  inventoryId: string;
+  /** Position for flasks and charms (0-based). */
+  x?: number;
+  /** Image on GGG's CDN (https://web.poecdn.com/...). */
+  url: string;
+  /** Size in inventory cells. */
+  w?: number;
+  h?: number;
 }
 
 export interface NinjaCharacter {

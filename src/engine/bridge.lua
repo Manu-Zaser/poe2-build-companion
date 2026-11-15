@@ -46,6 +46,18 @@ local STATS = {
 	"LightningMaximumHitTaken", "ChaosMaximumHitTaken",
 	"CombinedDPS", "TotalDPS", "FullDPS",
 	"Str", "Dex", "Int", "ReqStr", "ReqDex", "ReqInt",
+	-- character / defence / recovery details for the stats column
+	"EffectiveLootRarityMod", "EnduranceChargesMax", "FrenzyChargesMax", "PowerChargesMax",
+	"EvadeChance", "PhysicalDamageReduction", "EffectiveBlockChance", "Ward",
+	"LifeRegenRecovery", "ManaRegenRecovery", "EnergyShieldRegenRecovery",
+	"LifeLeechGainRate", "ManaLeechGainRate", "EnergyShieldLeechGainRate",
+	"EnergyShieldRecharge", "EnergyShieldRechargeDelay",
+}
+
+-- Per-skill values shown under "Main skills".
+local SKILL_STATS = {
+	"CombinedDPS", "TotalDPS", "Speed", "HitSpeed", "HitChance", "CritChance", "CritMultiplier",
+	"ProjectileCount", "AreaOfEffectRadiusMetres",
 }
 local ELEMENTS = { "Fire", "Cold", "Lightning", "Chaos" }
 for _, e in ipairs(ELEMENTS) do
@@ -58,7 +70,7 @@ end
 local function pickStats(output)
 	local res = {}
 	for _, k in ipairs(STATS) do
-		local v = round(output[k], 1)
+		local v = round(output[k], 3)
 		if v ~= nil then
 			res[k] = v
 		end
@@ -90,6 +102,8 @@ local function describeItem(item)
 		base = item.baseName,
 		rarity = item.rarity,
 		corrupted = item.corrupted or false,
+		quality = item.quality,
+		itemLevel = item.itemLevel,
 		mods = modLines(item),
 		raw = item:BuildRaw(),
 	}
@@ -105,10 +119,9 @@ local function isJewelSlot(slotName)
 	return slotName:find("^Jewel") or slotName:find("Socket") ~= nil
 end
 
--- Equipped items in PoB's slot order. Only visible, active slots of the active weapon set.
+-- Equipped items in PoB's slot order: both weapon sets (set = 1 or 2), other visible slots, jewels.
 local function equipped()
 	local itemsTab = build.itemsTab
-	local weaponSet = build.calcsTab.mainEnv and build.calcsTab.mainEnv.weaponSet or 1
 	local gear, jewels = {}, {}
 	for _, slot in ipairs(itemsTab.orderedSlots) do
 		local name = slot.slotName
@@ -117,9 +130,8 @@ local function equipped()
 			if item then
 				jewels[#jewels + 1] = { slot = name, item = describeItem(item) }
 			end
-		elseif (not slot.weaponSet or slot.weaponSet == weaponSet) and (slot.weaponSet or not slot.shown or slot.shown())
-			and (item or CORE_SLOTS[name:gsub(" Swap$", "")]) then
-			gear[#gear + 1] = { slot = name, item = item and describeItem(item) or JSON_NULL }
+		elseif (slot.weaponSet or not slot.shown or slot.shown()) and (item or CORE_SLOTS[name:gsub(" Swap$", "")]) then
+			gear[#gear + 1] = { slot = name, set = slot.weaponSet or JSON_NULL, item = item and describeItem(item) or JSON_NULL }
 		end
 	end
 	return gear, jewels
@@ -136,11 +148,17 @@ local function skillDps()
 			local active = skills[group.mainActiveSkill or 1] or skills[1]
 			local ok, out = pcall(calcFunc, { mainSocketGroup = i, weaponSet = group.usingSkillSet })
 			local dps = ok and out and (out.CombinedDPS or out.TotalDPS) or 0
-			if dps > 0 and active.activeEffect and active.activeEffect.grantedEffect then
+			if dps >= 1 and active.activeEffect and active.activeEffect.grantedEffect then
+				local stats = {}
+				for _, k in ipairs(SKILL_STATS) do
+					stats[k] = round(out[k], 2)
+				end
 				res[#res + 1] = {
+					group = i,
 					name = active.activeEffect.grantedEffect.name,
 					part = active.skillPartName,
 					dps = round(dps, 1),
+					stats = stats,
 					main = i == build.mainSocketGroup or nil,
 				}
 			end
@@ -148,6 +166,59 @@ local function skillDps()
 	end
 	table.sort(res, function(a, b) return a.dps > b.dps end)
 	return res
+end
+
+-- Skill groups with their gems, as in PoB's Skills tab.
+local function gemGroups()
+	local res = {}
+	for i, group in ipairs(build.skillsTab.socketGroupList) do
+		local gems = {}
+		for _, gem in ipairs(group.gemList or {}) do
+			local granted = gem.gemData and gem.gemData.grantedEffect
+			gems[#gems + 1] = {
+				name = gem.nameSpec ~= "" and gem.nameSpec or (granted and granted.name) or "?",
+				level = gem.level,
+				quality = gem.quality,
+				support = granted and granted.support or false,
+				enabled = gem.enabled ~= false,
+			}
+		end
+		if #gems > 0 then
+			res[#res + 1] = {
+				index = i,
+				label = group.label ~= "" and group.label or JSON_NULL,
+				slot = group.slot or JSON_NULL,
+				fromItem = group.source ~= nil or nil,
+				enabled = group.enabled ~= false,
+				main = i == build.mainSocketGroup or nil,
+				gems = gems,
+			}
+		end
+	end
+	return res
+end
+
+-- Allocated keystones and ascendancy nodes, plus point counts as PoB counts them.
+local function passives()
+	local spec = build.spec
+	if not spec then
+		return { points = 0, weaponSetPoints = 0, ascendancyPoints = 0, nodes = {} }
+	end
+	local nodes = {}
+	for _, node in pairs(spec.allocNodes) do
+		local kind = node.ascendancyName and not node.isAscendancyStart and (node.type == "Notable" or node.isNotable) and "ascendancy"
+			or (not node.ascendancyName and node.type == "Keystone" and "keystone")
+		if kind then
+			nodes[#nodes + 1] = { name = node.dn, kind = kind, lines = node.sd or {} }
+		end
+	end
+	table.sort(nodes, function(a, b)
+		if a.kind ~= b.kind then return a.kind == "ascendancy" end
+		return a.name < b.name
+	end)
+	local used, ascUsed, _, _, ws1, ws2 = spec:CountAllocNodes()
+	-- Weapon set points are spent twice (once per set) but count once, as in game.
+	return { points = used - ws1 - ws2 + math.max(ws1, ws2), weaponSetPoints = math.max(ws1, ws2), ascendancyPoints = ascUsed, nodes = nodes }
 end
 
 local function mainSkillName()
@@ -168,6 +239,8 @@ local function overview()
 		weaponSet = build.calcsTab.mainEnv and build.calcsTab.mainEnv.weaponSet or 1,
 		stats = pickStats(build.calcsTab.mainOutput),
 		skills = skillDps(),
+		gemGroups = gemGroups(),
+		passives = passives(),
 		gear = gear,
 		jewels = jewels,
 	}

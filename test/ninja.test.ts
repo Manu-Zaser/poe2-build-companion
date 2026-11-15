@@ -52,7 +52,18 @@ describe('fetchNinjaBuild', () => {
     return { f, urls };
   };
   const me = { league: 'forbiddenrites', account: 'A-1', character: 'My Char' };
-  const model = JSON.stringify({ type: 'found', charModel: { lastCheckedUtc: '2026-11-15T21:35:10Z', updatedUtc: '2026-11-15T20:43:14Z', level: 94, class: 'Deadeye' } });
+  const model = JSON.stringify({ type: 'found', charModel: {
+    lastCheckedUtc: '2026-11-15T21:35:10Z',
+    updatedUtc: '2026-11-15T20:43:14Z',
+    level: 94,
+    class: 'Deadeye',
+    league: 'Forbidden Rites',
+    items: [
+      { itemData: { inventoryId: 'Weapon', name: 'Morbid Stinger', typeLine: 'Obliterator Bow', icon: 'https://web.poecdn.com/gen/image/bow.png', w: 2, h: 4 } },
+      { itemData: { inventoryId: 'Helm', name: 'Evil', typeLine: 'Cap', icon: 'https://evil.example/x.png' } },
+    ],
+    flasks: [{ itemData: { inventoryId: 'Flask', name: '', typeLine: 'Opaque Ultimate Life Flask of the Surgeon', icon: 'https://web.poecdn.com/f.png', x: 0 } }],
+  } });
 
   it('loads the code from the profile and adds the timestamps', async () => {
     const { f, urls } = fakeFetch({ body: 'eNrtCODE\n' }, { body: model });
@@ -62,6 +73,11 @@ describe('fetchNinjaBuild', () => {
       updatedAt: '2026-11-15T20:43:14Z',
       level: 94,
       className: 'Deadeye',
+      leagueName: 'Forbidden Rites',
+      icons: [
+        { name: 'Morbid Stinger, Obliterator Bow', inventoryId: 'Weapon', x: undefined, w: 2, h: 4, url: 'https://web.poecdn.com/gen/image/bow.png' },
+        { name: 'Opaque Ultimate Life Flask of the Surgeon', inventoryId: 'Flask', x: 0, w: undefined, h: undefined, url: 'https://web.poecdn.com/f.png' },
+      ],
     });
     expect(urls).toEqual([
       'https://poe.ninja/poe2/pob/raw/profile/code/A-1/forbiddenrites/My%20Char',

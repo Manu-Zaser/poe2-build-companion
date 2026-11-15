@@ -3,7 +3,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { decodeBuildCode, MAX_CODE_LENGTH, normalizeBuildCode } from '../shared/buildcode';
 import { characterLink, fetchNinjaBuild, parseCharacterLink } from '../shared/ninja';
-import type { BuildSource, BuildView, NinjaCharacter, Overview, StoredBuild, StoredState } from '../shared/types';
+import type { BuildSource, BuildView, ItemIcon, NinjaCharacter, Overview, StoredBuild, StoredState } from '../shared/types';
 import { Engine } from './engine';
 import { log } from './log';
 
@@ -28,6 +28,16 @@ function sanitizeNinja(v: unknown): NinjaCharacter | undefined {
   return { account: account.slice(0, 100), character: character.slice(0, 100), league };
 }
 
+function sanitizeIcons(v: unknown): ItemIcon[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined);
+  return v
+    .filter((i): i is Record<string, unknown> => !!i && typeof i === 'object')
+    .filter((i) => typeof i.name === 'string' && typeof i.inventoryId === 'string' && typeof i.url === 'string' && i.url.startsWith('https://web.poecdn.com/'))
+    .slice(0, 100)
+    .map((i) => ({ name: i.name as string, inventoryId: i.inventoryId as string, url: i.url as string, x: num(i.x), w: num(i.w), h: num(i.h) }));
+}
+
 function sanitizeBuild(v: unknown): StoredBuild | undefined {
   if (!v || typeof v !== 'object') return undefined;
   const b = v as Record<string, unknown>;
@@ -44,6 +54,8 @@ function sanitizeBuild(v: unknown): StoredBuild | undefined {
     source,
     importedAt: b.importedAt,
     ...(typeof b.snapshotAt === 'string' ? { snapshotAt: b.snapshotAt } : {}),
+    ...(source.kind === 'ninja' && typeof b.leagueName === 'string' ? { leagueName: b.leagueName.slice(0, 80) } : {}),
+    ...(source.kind === 'ninja' && sanitizeIcons(b.icons) ? { icons: sanitizeIcons(b.icons) } : {}),
   };
 }
 
@@ -95,10 +107,10 @@ async function calculate(code: string): Promise<Overview> {
   return result;
 }
 
-async function setBuild(code: string, source: BuildSource, snapshotAt?: string) {
+async function setBuild(code: string, source: BuildSource, extra: Pick<StoredBuild, 'snapshotAt' | 'icons' | 'leagueName'> = {}) {
   const ov = await calculate(code);
   overview = ov;
-  store.build = { code, source, importedAt: new Date().toISOString(), ...(snapshotAt ? { snapshotAt } : {}) };
+  store.build = { code, source, importedAt: new Date().toISOString(), ...extra };
   saveStore();
   pushView();
 }
@@ -114,7 +126,7 @@ async function refreshFromNinja(): Promise<Result> {
     const nb = await fetchNinjaBuild(ninja, userAgent());
     const code = normalizeBuildCode(nb.code);
     if (!code) throw new Error('poe.ninja returned an invalid build code.');
-    await setBuild(code, { kind: 'ninja', ...ninja }, nb.checkedAt);
+    await setBuild(code, { kind: 'ninja', ...ninja }, { snapshotAt: nb.checkedAt, icons: nb.icons, leagueName: nb.leagueName });
     return ok();
   } catch (err) {
     log(`ninja refresh failed: ${err instanceof Error ? err.message : err}`);
@@ -136,6 +148,13 @@ function registerIpc() {
     } catch (err) {
       return fail(err);
     }
+  });
+
+  // Writes the current build code to the clipboard (for Path of Building), on click only.
+  ipcMain.handle('build:copy', () => {
+    if (!store.build) return false;
+    clipboard.writeText(store.build.code);
+    return true;
   });
 
   ipcMain.handle('ninja:set', async (_e, link: unknown): Promise<Result> => {

@@ -34,3 +34,12 @@ export function isStale(iso: string, now = Date.now()): boolean {
   const t = Date.parse(iso);
   return !Number.isFinite(t) || now - t > STALE_AFTER_MS;
 }
+
+/** Very short form for tight rows, as poe.ninja shows max hits: 950 · 3.7k · 13k · 1.3M */
+export function short(n: number): string {
+  if (!Number.isFinite(n)) return '–';
+  const a = Math.abs(n);
+  if (a >= 1e6) return `${(n / 1e6).toFixed(a >= 1e7 ? 0 : 1)}M`;
+  if (a >= 1e3) return `${(n / 1e3).toFixed(a >= 1e4 ? 0 : 1)}k`;
+  return fmt(Math.round(n));
+}

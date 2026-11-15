@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' https://web.poecdn.com" />
   <title>PoE2 Build Companion</title>
   <link rel="stylesheet" href="base.css" />
   <link rel="stylesheet" href="app.css" />
@@ -64,56 +64,61 @@
         </div>
 
         <div id="char" hidden>
-          <div class="hero card pad">
-            <div class="hero-main">
-              <div class="hero-title" id="hero-title"></div>
-              <div class="hero-sub" id="hero-sub"></div>
+          <header class="profile card">
+            <div class="profile-main">
+              <div class="league" id="p-league"></div>
+              <h2 class="char-name" id="p-name"></h2>
+              <div class="char-class" id="p-class"></div>
             </div>
-            <div class="hero-side">
-              <div class="freshness" id="freshness"></div>
-              <div class="row">
-                <button class="btn sm" id="hero-paste" title="Read a Path of Building code from the clipboard">Paste code</button>
-                <button class="btn sm primary" id="hero-refresh" hidden>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
-                  <span>Refresh from poe.ninja</span>
-                </button>
-              </div>
+            <dl class="profile-meta" id="p-meta"></dl>
+            <div class="profile-actions">
+              <button class="btn sm" id="hero-copy" title="Copy the build code for Path of Building">Copy PoB code</button>
+              <button class="btn sm" id="hero-paste" title="Read a Path of Building code from the clipboard">Paste code</button>
+              <button class="btn sm primary" id="hero-refresh" hidden>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
+                <span>Refresh</span>
+              </button>
             </div>
+          </header>
+
+          <div class="profile-layout">
+            <div class="col-main">
+              <section class="card pad">
+                <div class="card-head">
+                  <h2>Equipment</h2>
+                  <div class="set-toggle" id="set-toggle" role="group" aria-label="Weapon set">
+                    <button data-set="1">I</button><button data-set="2">II</button>
+                  </div>
+                </div>
+                <div class="doll" id="doll"></div>
+                <div class="belt-items" id="belt-items"></div>
+                <div class="jewels" id="jewels-wrap">
+                  <h3>Jewels</h3>
+                  <div class="jewel-list" id="jewels"></div>
+                </div>
+              </section>
+
+              <section class="card pad">
+                <div class="card-head"><h2>Skills</h2><span class="card-note" id="skills-note"></span></div>
+                <div class="gem-groups" id="gem-groups"></div>
+              </section>
+
+              <section class="card pad">
+                <div class="card-head"><h2>Ascendancy &amp; keystones</h2><span class="card-note" id="passive-note"></span></div>
+                <div class="nodes" id="nodes"></div>
+              </section>
+            </div>
+
+            <aside class="col-stats card">
+              <section class="stat-block"><h3>Character</h3><dl class="stat-rows" id="st-character"></dl></section>
+              <section class="stat-block"><h3>Defensive</h3><dl class="stat-rows" id="st-defensive"></dl></section>
+              <section class="stat-block"><h3>Recovery</h3><dl class="stat-rows" id="st-recovery"></dl></section>
+              <section class="stat-block"><h3>Main skills</h3><div class="main-skills" id="st-skills"></div></section>
+            </aside>
           </div>
-
-          <div class="kpis" id="kpis"></div>
-
-          <div class="char-layout">
-            <div class="gear" id="gear"></div>
-
-            <div class="side">
-              <div class="card pad">
-                <div class="card-head"><h2>Resistances</h2><span class="card-note" id="res-note"></span></div>
-                <div class="res-list" id="res-list"></div>
-              </div>
-
-              <div class="card pad">
-                <div class="card-head"><h2>Damage</h2><span class="card-note" id="dps-note"></span></div>
-                <ul class="skill-list" id="skills"></ul>
-              </div>
-
-              <div class="card pad">
-                <div class="card-head"><h2>Defences</h2></div>
-                <dl class="totals" id="defences"></dl>
-              </div>
-
-              <div class="card pad">
-                <div class="card-head"><h2>Attributes</h2></div>
-                <dl class="totals" id="attributes"></dl>
-              </div>
-            </div>
-          </div>
-
-          <details class="card pad jewels" id="jewels-card">
-            <summary><h2>Jewels</h2><span class="card-note" id="jewel-count"></span></summary>
-            <div class="jewel-grid" id="jewels"></div>
-          </details>
         </div>
+
+        <div class="item-tip" id="item-tip" hidden></div>
       </section>
 
       <!-- BUILD SOURCE -->

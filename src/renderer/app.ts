@@ -1,6 +1,6 @@
 import type { Api } from '../main/preload';
-import type { BuildView, ItemInfo, Overview, Stats } from '../shared/types';
-import { ageText, compact, fmt, isStale } from './format';
+import type { BuildView, GearSlot, ItemIcon, ItemInfo, Overview, SkillDps, Stats } from '../shared/types';
+import { ageText, compact, fmt, isStale, short } from './format';
 
 declare global {
   interface Window { api: Api }
@@ -17,6 +17,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, ...chil
 }
 
 let current: BuildView | null = null;
+/** Weapon set shown in the equipment view (null = the build's active set). */
+let shownSet: number | null = null;
 
 // ---------- Navigation ----------
 
@@ -37,11 +39,14 @@ for (const b of document.querySelectorAll<HTMLElement>('[data-page].nav-item, [d
 
 // ---------- Messages ----------
 
+let msgTimer: ReturnType<typeof setTimeout> | undefined;
 function message(text: string, kind: 'ok' | 'error' | 'warn' = 'ok') {
   const box = $('msg');
   box.textContent = text;
   box.className = `banner${kind === 'ok' ? '' : ` ${kind}`}`;
   box.hidden = !text;
+  clearTimeout(msgTimer);
+  if (text && kind === 'ok') msgTimer = setTimeout(() => (box.hidden = true), 5000);
 }
 
 /** Runs an action with a busy button and shows its result. */
@@ -61,174 +66,343 @@ async function run(button: HTMLButtonElement, action: () => Promise<{ ok: boolea
   }
 }
 
-// ---------- Rendering ----------
+// ---------- Items: pictures and tooltip ----------
 
-const SLOT_LABELS: Record<string, string> = {
-  'Weapon 1': 'Main hand',
-  'Weapon 2': 'Off hand',
-  'Weapon 1 Swap': 'Main hand',
-  'Weapon 2 Swap': 'Off hand',
-  'Body Armour': 'Body armour',
-  'Ring 1': 'Left ring',
-  'Ring 2': 'Right ring',
+/** PoB slot → game inventory id (used when an item cannot be matched by name). */
+const INVENTORY_IDS: Record<string, string> = {
+  'Weapon 1': 'Weapon',
+  'Weapon 2': 'Offhand',
+  'Weapon 1 Swap': 'Weapon2',
+  'Weapon 2 Swap': 'Offhand2',
+  Helmet: 'Helm',
+  'Body Armour': 'BodyArmour',
+  Gloves: 'Gloves',
+  Boots: 'Boots',
+  Amulet: 'Amulet',
+  'Ring 1': 'Ring',
+  'Ring 2': 'Ring2',
+  Belt: 'Belt',
 };
-const slotLabel = (slot: string) => SLOT_LABELS[slot] ?? slot;
 
-function itemCard(slot: string, item: ItemInfo | null): HTMLElement {
-  if (!item) return el('div', 'slot empty', el('div', 'slot-label', slotLabel(slot)), 'Empty');
-  const rarity = `rarity-${item.rarity.toLowerCase()}`;
-  const mods = el('ul', 'mods');
-  let lastKind = '';
+function iconFor(item: ItemInfo, slot: string, icons: ItemIcon[]): string | undefined {
+  return (icons.find((i) => i.name === item.name) ?? icons.find((i) => i.inventoryId === INVENTORY_IDS[slot]))?.url;
+}
+
+const rarityCls = (item: ItemInfo) => `rarity-${item.rarity.toLowerCase()}`;
+
+function itemTooltip(item: ItemInfo): HTMLElement {
+  const hasTitle = !!item.title && item.title !== item.base;
+  const head = el('div', 'tip-head', el('div', `t1 ${rarityCls(item)}`, hasTitle ? item.title! : item.base), hasTitle && el('div', `t2 ${rarityCls(item)}`, item.base));
+  const body = el('div', 'tip-body');
+  const meta = [item.quality ? `Quality +${item.quality}%` : '', item.itemLevel ? `Item level ${item.itemLevel}` : ''].filter(Boolean).join(' · ');
+  if (meta) body.append(el('div', 'meta', meta));
+  let lastGroup = meta ? 'meta' : '';
   for (const m of item.mods) {
-    const group = m.kind === 'explicit' || m.kind === 'unique' ? 'main' : 'pre';
-    if (lastKind && group !== lastKind) mods.append(el('li', 'sep'));
-    lastKind = group;
-    const li = el('li', m.kind + (m.inactive ? ' inactive' : ''), m.text);
-    if (m.inactive) li.title = 'Path of Building does not use this line in its calculation';
-    mods.append(li);
+    const group = m.kind === 'explicit' || m.kind === 'unique' ? 'main' : m.kind;
+    if (lastGroup && group !== lastGroup) body.append(el('div', 'sep'));
+    lastGroup = group;
+    body.append(el('div', `m ${m.kind}${m.inactive ? ' inactive' : ''}`, m.text));
   }
-  const hasTitle = item.title && item.title !== item.base;
-  return el(
-    'div',
-    'slot',
-    el('div', 'slot-label', el('span', '', slotLabel(slot)), item.corrupted && el('span', 'corrupted', 'Corrupted')),
-    el('div', `slot-name ${rarity}`, hasTitle ? item.title! : item.base),
-    hasTitle && el('div', 'slot-base', item.base),
-    item.mods.length > 0 && mods,
+  if (item.corrupted) body.append(el('div', 'corrupted', 'Corrupted'));
+  return el('div', '', head, body);
+}
+
+const tip = () => $('item-tip');
+function attachTooltip(target: HTMLElement, item: ItemInfo) {
+  target.addEventListener('mouseenter', () => {
+    tip().replaceChildren(itemTooltip(item));
+    tip().hidden = false;
+    const r = target.getBoundingClientRect();
+    const t = tip().getBoundingClientRect();
+    // Right of the item if there is room, otherwise left; always inside the window.
+    let x = r.right + 10;
+    if (x + t.width > window.innerWidth - 8) x = Math.max(8, r.left - t.width - 10);
+    const y = Math.min(Math.max(8, r.top), window.innerHeight - t.height - 8);
+    tip().style.left = `${x}px`;
+    tip().style.top = `${y}px`;
+  });
+  target.addEventListener('mouseleave', () => (tip().hidden = true));
+}
+
+function itemCell(item: ItemInfo | null, slot: string, icons: ItemIcon[], label: string): HTMLElement {
+  if (!item) return el('div', 'cell', el('span', 'empty-label', label));
+  const url = iconFor(item, slot, icons);
+  const cell = el('div', `cell filled ${rarityCls(item)}`);
+  const nameTile = () => el('span', `tile-name ${rarityCls(item)}`, item.title ?? item.base);
+  if (url) {
+    const img = el('img');
+    img.src = url;
+    img.alt = item.title ?? item.base;
+    // Picture unavailable (offline, CDN change): show the name instead.
+    img.addEventListener('error', () => img.replaceWith(nameTile()));
+    cell.append(img);
+  } else {
+    cell.append(nameTile());
+  }
+  if (item.corrupted) cell.append(el('i', 'corrupt'));
+  attachTooltip(cell, item);
+  return cell;
+}
+
+// ---------- Equipment ----------
+
+/** Slot (without " Swap"), grid area, label for empty slots. */
+const DOLL: [string, string, string][] = [
+  ['Weapon 1', 'w1', 'Main hand'],
+  ['Weapon 2', 'w2', 'Off hand'],
+  ['Helmet', 'he', 'Helmet'],
+  ['Body Armour', 'bo', 'Body'],
+  ['Amulet', 'am', 'Amulet'],
+  ['Ring 1', 'r1', 'Ring'],
+  ['Ring 2', 'r2', 'Ring'],
+  ['Gloves', 'gl', 'Gloves'],
+  ['Boots', 'ft', 'Boots'],
+  ['Belt', 'be', 'Belt'],
+];
+
+function renderEquipment(ov: Overview, icons: ItemIcon[]) {
+  const set = shownSet ?? ov.weaponSet;
+  const bySlot = new Map<string, GearSlot>(ov.gear.map((g) => [g.slot, g]));
+  $('doll').replaceChildren(
+    ...DOLL.map(([slot, area, label]) => {
+      const name = slot.startsWith('Weapon') && set === 2 ? `${slot} Swap` : slot;
+      const cell = itemCell(bySlot.get(name)?.item ?? null, name, icons, label);
+      cell.style.gridArea = area;
+      return cell;
+    }),
+  );
+
+  for (const b of document.querySelectorAll<HTMLButtonElement>('#set-toggle button')) {
+    const n = Number(b.dataset.set);
+    b.classList.toggle('active', n === set);
+    b.replaceChildren(n === 1 ? 'I' : 'II', n === ov.weaponSet ? el('span', 'dot') : '');
+    b.title = n === ov.weaponSet ? `Weapon set ${n} – used by the build` : `Weapon set ${n}`;
+  }
+
+  const flasks = ov.gear.filter((g) => g.item && g.slot.startsWith('Flask'));
+  const charms = ov.gear.filter((g) => g.item && g.slot.startsWith('Charm'));
+  const belt: HTMLElement[] = flasks.map((g) => {
+    const c = itemCell(g.item, g.slot, icons, '');
+    c.classList.add('tall');
+    return c;
+  });
+  if (flasks.length && charms.length) belt.push(el('span', 'gap'));
+  belt.push(...charms.map((g) => itemCell(g.item, g.slot, icons, '')));
+  $('belt-items').replaceChildren(...belt);
+
+  $('jewels-wrap').hidden = ov.jewels.length === 0;
+  $('jewels').replaceChildren(
+    ...ov.jewels.map((j) => {
+      const text = el('div', 'jewel-text', el('b', rarityCls(j.item), j.item.title ?? j.item.base), j.item.title && el('span', '', j.item.base));
+      // Without a picture the name alone is clearer than a tiny name tile.
+      const pic = iconFor(j.item, j.slot, icons) ? itemCell(j.item, j.slot, icons, '') : null;
+      const row = el('div', 'jewel', pic, text);
+      attachTooltip(row, j.item);
+      return row;
+    }),
   );
 }
 
-function kpi(cls: string, label: string, value: string, sub?: string, title?: string) {
-  const k = el('div', `kpi ${cls}`, el('span', '', label), el('strong', '', value), sub && el('small', '', sub));
-  if (title) k.title = title;
-  return k;
+// ---------- Skills & passives ----------
+
+function renderGemGroups(ov: Overview) {
+  const groups = ov.gemGroups.filter((g) => g.gems.some((x) => !x.support));
+  $('skills-note').textContent = `${groups.filter((g) => g.enabled).length} active groups`;
+  if (groups.length === 0) {
+    $('gem-groups').replaceChildren(el('p', 'empty-note', 'No skills in this build.'));
+    return;
+  }
+  $('gem-groups').replaceChildren(
+    ...groups.map((g) => {
+      const actives = g.gems.filter((x) => !x.support);
+      const supports = g.gems.filter((x) => x.support);
+      const box = el('div', `gem-group${g.main ? ' main' : ''}${g.enabled ? '' : ' off'}`);
+      actives.forEach((a, i) => {
+        const lv = [a.level !== undefined ? String(a.level) : '', a.quality ? `${a.quality}%` : ''].filter(Boolean).join(' / ');
+        box.append(el('div', 'gem-active', el('span', '', a.name), lv && el('span', 'lv', lv)));
+        if (i === 0) {
+          const tags = [g.main && 'Main skill', g.fromItem && 'from item', !g.enabled && 'disabled', g.label].filter(Boolean).join(' · ');
+          if (tags) box.append(el('div', 'tag-line', tags));
+        }
+      });
+      if (supports.length) box.append(el('ul', 'supports', ...supports.map((s) => el('li', s.enabled ? '' : 'off', s.name))));
+      return box;
+    }),
+  );
 }
+
+function renderPassives(ov: Overview) {
+  const p = ov.passives;
+  $('passive-note').textContent = `${p.points} passives${p.weaponSetPoints ? ` (incl. ${p.weaponSetPoints} weapon set)` : ''} · ${p.ascendancyPoints} ascendancy`;
+  if (p.nodes.length === 0) {
+    $('nodes').replaceChildren(el('p', 'empty-note', 'No ascendancy or keystones allocated.'));
+    return;
+  }
+  $('nodes').replaceChildren(
+    ...p.nodes.map((nd) => el('div', `node ${nd.kind}`, el('b', '', nd.name), el('small', '', nd.kind === 'ascendancy' ? 'Ascendancy' : 'Keystone'), ...nd.lines.map((l) => el('p', '', l)))),
+  );
+}
+
+// ---------- Stats column ----------
 
 const n = (s: Stats, k: string) => s[k] ?? 0;
+type Row = [string, Node | string, string?] | HTMLElement;
 
-function renderKpis(ov: Overview) {
-  const s = ov.stats;
-  const spiritFree = n(s, 'SpiritUnreserved');
-  const spirit = kpi('spirit', 'Spirit', fmt(n(s, 'Spirit')), `${fmt(spiritFree)} unreserved`);
-  if (spiritFree < 0) spirit.classList.add('warn');
-  const dps = n(s, 'CombinedDPS') || n(s, 'TotalDPS');
-  $('kpis').replaceChildren(
-    kpi('life', 'Life', fmt(n(s, 'Life'))),
-    kpi('es', 'Energy Shield', fmt(n(s, 'EnergyShield'))),
-    kpi('mana', 'Mana', fmt(n(s, 'Mana'))),
-    spirit,
-    kpi('ehp', 'Effective HP', fmt(n(s, 'TotalEHP')), `max phys hit ${fmt(n(s, 'PhysicalMaximumHitTaken'))}`, 'Effective Health Pool as calculated by Path of Building'),
-    kpi('dps', 'DPS', compact(dps), ov.mainSkill ?? '', 'Combined DPS of the main skill'),
-  );
+function rows(id: string, list: Row[]) {
+  $(id).replaceChildren(...list.flatMap((r) => (r instanceof HTMLElement ? [r] : [el('dt', '', r[0]), el('dd', r[2] ?? '', r[1])])));
+}
+
+/** "a / b / c" with each part coloured. */
+function parts(values: [string, string][]): HTMLElement {
+  const span = el('span');
+  values.forEach(([text, cls], i) => {
+    if (i) span.append(el('span', 'sl', '/'));
+    span.append(el('span', cls, text));
+  });
+  return span;
 }
 
 const ELEMENTS = [
-  ['Fire', 'fire'],
-  ['Cold', 'cold'],
-  ['Lightning', 'lightning'],
-  ['Chaos', 'chaos'],
+  ['Fire', 'c-fire'],
+  ['Cold', 'c-cold'],
+  ['Lightning', 'c-lightning'],
+  ['Chaos', 'c-chaos'],
+] as const;
+const ATTRS = [
+  ['Str', 'c-str'],
+  ['Dex', 'c-dex'],
+  ['Int', 'c-int'],
 ] as const;
 
-function renderResistances(s: Stats) {
-  let below = 0;
-  const rows = ELEMENTS.map(([name, cls]) => {
+function renderStats(ov: Overview) {
+  const s = ov.stats;
+  const unmet = ATTRS.filter(([k]) => n(s, `Req${k}`) > n(s, k));
+  const charRows: Row[] = [
+    ['Attributes', parts(ATTRS.map(([k, cls]) => [fmt(n(s, k)), cls]))],
+    // PoB gives both as multipliers: 1.45 = 145 % movement speed, 2.15 = 115 % increased rarity.
+    ['Movement speed', `${fmt(Math.round(n(s, 'EffectiveMovementSpeedMod') * 100))}%`],
+    ['Item rarity', `${fmt(Math.round((n(s, 'EffectiveLootRarityMod') - 1) * 100))}%`],
+    ['Charges', parts([[fmt(n(s, 'EnduranceChargesMax')), 'c-life'], [fmt(n(s, 'FrenzyChargesMax')), 'c-dex'], [fmt(n(s, 'PowerChargesMax')), 'c-int']])],
+  ];
+  if (unmet.length) charRows.push(el('div', 'cap-warn', `Requirement not met: ${unmet.map(([k]) => `${k} ${fmt(n(s, k))} of ${fmt(n(s, `Req${k}`))}`).join(', ')}`));
+  rows('st-character', charRows);
+
+  // Resistances: wavy red underline when below the cap, details in the tooltip and the warning below.
+  const res = el('span');
+  const under: string[] = [];
+  ELEMENTS.forEach(([name, cls], i) => {
+    if (i) res.append(el('span', 'sl', '/'));
     const value = n(s, `${name}Resist`);
     const missing = n(s, `Missing${name}Resist`);
     const over = n(s, `${name}ResistOverCap`);
-    const max = value + missing;
-    if (missing > 0) below++;
-    const pct = (v: number) => `${Math.max(0, Math.min(100, v))}%`;
-    const bar = el('div', 'res-bar', el('i'), el('b'));
-    (bar.firstChild as HTMLElement).style.width = pct(value);
-    (bar.lastChild as HTMLElement).style.left = pct(max);
-    const note =
-      missing > 0 ? el('small', 'miss', `${fmt(missing)} below cap`) : over > 0 ? el('small', 'over', `+${fmt(over)} over cap`) : el('small', 'ok', 'capped');
-    const row = el('div', `res-row ${cls}`, el('span', 'res-name', name), bar, el('div', 'res-val', el('strong', '', `${fmt(value)}%`), ` / ${fmt(max)}%`, note));
-    row.title = `${name}: ${fmt(n(s, `${name}ResistTotal`))}% before the cap, maximum ${fmt(max)}%`;
-    return row;
+    const v = el('span', cls + (missing > 0 ? ' res-under' : ''), `${fmt(value)}%`);
+    v.title = missing > 0 ? `${name}: ${fmt(missing)}% below the cap of ${fmt(value + missing)}%` : `${name}: capped${over > 0 ? `, +${fmt(over)}% over` : ''}`;
+    res.append(v);
+    if (missing > 0) under.push(`${name} ${fmt(missing)}%`);
   });
-  $('res-list').replaceChildren(...rows);
-  const note = $('res-note');
-  note.textContent = below === 0 ? 'all capped' : `${below} below cap`;
-  note.style.color = below === 0 ? 'var(--ok)' : '#f0a597';
+
+  const spiritFree = n(s, 'SpiritUnreserved');
+  const def: Row[] = [
+    ['Life', el('span', 'c-life', fmt(n(s, 'Life')))],
+    ['Energy shield', el('span', 'c-es', fmt(n(s, 'EnergyShield')))],
+    ['Mana', el('span', 'c-mana', fmt(n(s, 'Mana')))],
+    ['Spirit', el('span', '', el('span', 'c-spirit', fmt(n(s, 'Spirit'))), el('small', '', `${fmt(spiritFree)} free`)), spiritFree < 0 ? 'warn' : ''],
+    ['Armour', n(s, 'Armour') ? fmt(n(s, 'Armour')) : '–'],
+    ['Evasion rating', n(s, 'Evasion') ? fmt(n(s, 'Evasion')) : '–'],
+    ['Evade chance', `${fmt(n(s, 'EvadeChance'))}%`],
+  ];
+  if (n(s, 'DeflectionRating') > 0) def.push(['Deflection rating', fmt(n(s, 'DeflectionRating'))], ['Deflect chance', `${fmt(n(s, 'DeflectChance'))}%`]);
+  if (n(s, 'EffectiveBlockChance') > 0) def.push(['Block chance', `${fmt(n(s, 'EffectiveBlockChance'))}%`]);
+  if (n(s, 'PhysicalDamageReduction') > 0) def.push(['Phys. damage reduction', `${fmt(n(s, 'PhysicalDamageReduction'))}%`]);
+  def.push(['Resistances', res]);
+  if (under.length) def.push(el('div', 'cap-warn', `Below cap: ${under.join(', ')}`));
+  if (spiritFree < 0) def.push(el('div', 'cap-warn', `Reservations exceed your Spirit by ${fmt(-spiritFree)}.`));
+  def.push(['Effective health pool', compact(n(s, 'TotalEHP'))]);
+  def.push([
+    'Max hit',
+    parts([
+      [short(n(s, 'PhysicalMaximumHitTaken')), 'c-phys'],
+      [short(n(s, 'FireMaximumHitTaken')), 'c-fire'],
+      [short(n(s, 'ColdMaximumHitTaken')), 'c-cold'],
+      [short(n(s, 'LightningMaximumHitTaken')), 'c-lightning'],
+      [short(n(s, 'ChaosMaximumHitTaken')), 'c-chaos'],
+    ]),
+  ]);
+  rows('st-defensive', def);
+
+  const rec: Row[] = [
+    ['Life regen', `${fmt(n(s, 'LifeRegenRecovery'))}/s`],
+    ['Mana regen', `${fmt(n(s, 'ManaRegenRecovery'))}/s`],
+  ];
+  if (n(s, 'LifeLeechGainRate') > 0) rec.push(['Life leech', `${fmt(n(s, 'LifeLeechGainRate'))}/s`]);
+  if (n(s, 'ManaLeechGainRate') > 0) rec.push(['Mana leech', `${fmt(n(s, 'ManaLeechGainRate'))}/s`]);
+  if (n(s, 'EnergyShield') > 0) {
+    rec.push(['Energy shield recharge', `${fmt(n(s, 'EnergyShieldRecharge'))}/s`]);
+    rec.push(['Recharge delay', `${fmt(n(s, 'EnergyShieldRechargeDelay'))}s`]);
+  }
+  rows('st-recovery', rec);
+
+  renderMainSkills(ov.skills);
 }
 
-function renderSkills(ov: Overview) {
-  const list = $('skills');
-  const skills = ov.skills.filter((sk) => sk.dps > 0).slice(0, 8);
+function skillLines(sk: SkillDps): [string, string] {
+  const s = sk.stats;
+  const first: string[] = [];
+  if (s.Speed) first.push(`${fmt(s.Speed)}/s`);
+  if (s.CritChance !== undefined) first.push(`${fmt(s.CritChance)}% / ${fmt((s.CritMultiplier ?? 0) * 100)}% crit`);
+  if (s.HitChance !== undefined) first.push(`${fmt(s.HitChance)}% hit`);
+  const second: string[] = [];
+  if (sk.part) second.push(sk.part);
+  if (s.ProjectileCount && s.ProjectileCount > 0) second.push(`${fmt(s.ProjectileCount)} proj`);
+  if (s.AreaOfEffectRadiusMetres) second.push(`${fmt(s.AreaOfEffectRadiusMetres)}m radius`);
+  return [first.join(' · '), second.join(' · ')];
+}
+
+function renderMainSkills(skills: SkillDps[]) {
   if (skills.length === 0) {
-    list.replaceChildren(el('li', 'empty-note', 'No damaging skills found in this build.'));
-    $('dps-note').textContent = '';
+    $('st-skills').replaceChildren(el('p', 'empty-note', 'No damaging skills found.'));
     return;
   }
-  const top = skills[0].dps;
-  list.replaceChildren(
-    ...skills.map((sk) => {
-      const bar = el('div', 'skill-bar', el('i'));
-      (bar.firstChild as HTMLElement).style.width = `${Math.max(2, (sk.dps / top) * 100)}%`;
-      const label = el('span', 'skill-name', sk.name, sk.part && el('small', '', sk.part));
-      return el('li', `skill${sk.main ? ' main' : ''}`, label, el('span', 'skill-dps', compact(sk.dps)), bar);
-    }),
-  );
-  $('dps-note').textContent = 'DPS per skill';
-}
-
-function dl(target: HTMLElement, rows: ([string, string, string?] | 'sep')[]) {
-  target.replaceChildren(
-    ...rows.flatMap((r) => (r === 'sep' ? [el('div', 'sep')] : [el('dt', '', r[0]), el('dd', r[2] ?? '', r[1])])),
-  );
-}
-
-function renderDefences(s: Stats) {
-  const rows: ([string, string, string?] | 'sep')[] = [
-    ['Evasion', fmt(n(s, 'Evasion'))],
-    ['Armour', fmt(n(s, 'Armour'))],
-  ];
-  if (n(s, 'DeflectionRating') > 0) rows.push(['Deflect chance', `${fmt(n(s, 'DeflectChance'))}%`]);
-  rows.push(['Movement speed', `${n(s, 'EffectiveMovementSpeedMod') >= 0 ? '+' : ''}${fmt(n(s, 'EffectiveMovementSpeedMod'))}%`]);
-  rows.push('sep');
-  for (const t of ['Physical', 'Fire', 'Cold', 'Lightning', 'Chaos']) rows.push([`Max ${t.toLowerCase()} hit`, fmt(n(s, `${t}MaximumHitTaken`))]);
-  dl($('defences'), rows);
-}
-
-function renderAttributes(s: Stats) {
-  dl(
-    $('attributes'),
-    (
-      [
-        ['Strength', 'Str'],
-        ['Dexterity', 'Dex'],
-        ['Intelligence', 'Int'],
-      ] as const
-    ).map(([label, k]) => {
-      const have = n(s, k);
-      const req = n(s, `Req${k}`);
-      return [label, req > have ? `${fmt(have)} / ${fmt(req)} needed` : fmt(have), req > have ? 'bad' : ''];
+  $('st-skills').replaceChildren(
+    ...skills.slice(0, 5).map((sk) => {
+      const [a, b] = skillLines(sk);
+      const box = el('div', `main-skill${sk.main ? ' main' : ''}`, el('span', 'n', sk.name), el('span', 'd', compact(sk.dps)), a && el('span', 's', a), b && el('span', 's', b));
+      box.title = sk.main ? 'Main skill of the build' : 'DPS if this were the main skill';
+      return box;
     }),
   );
 }
 
-function renderFreshness(v: BuildView) {
+// ---------- Header ----------
+
+/** "forbiddenrites" → "Forbiddenrites"; poe.ninja's URL names have no spaces. */
+const leagueName = (slug: string) => slug.charAt(0).toUpperCase() + slug.slice(1);
+
+function renderHeader(v: BuildView, ov: Overview) {
   const b = v.build;
-  const box = $('freshness');
-  if (!b) return box.replaceChildren();
-  const parts: string[] = [];
-  let stale: boolean;
-  if (b.source.kind === 'ninja') {
-    stale = isStale(b.snapshotAt ?? b.importedAt);
-    parts.push(b.snapshotAt ? `poe.ninja checked ${ageText(b.snapshotAt)}` : 'from poe.ninja');
-    parts.push(`loaded ${ageText(b.importedAt)}`);
-  } else {
-    stale = isStale(b.importedAt);
-    parts.push(`Build code pasted ${ageText(b.importedAt)}`);
+  const src = b?.source;
+  const cls = ov.ascendancy && ov.ascendancy !== 'None' ? ov.ascendancy : ov.className ?? '';
+  $('p-league').textContent = src?.kind === 'ninja' ? `${b?.leagueName ?? leagueName(src.league)} league` : 'From a Path of Building code';
+  $('p-name').textContent = src?.kind === 'ninja' ? src.character : cls || 'Character';
+  $('p-class').replaceChildren(el('b', '', `Level ${ov.level ?? '?'}`), ` ${cls}`);
+
+  const meta: [string, string, boolean?][] = [];
+  if (src?.kind === 'ninja') meta.push(['Account', src.account.replace(/-(\d+)$/, '#$1')]);
+  if (b) {
+    const when = src?.kind === 'ninja' ? b.snapshotAt ?? b.importedAt : b.importedAt;
+    meta.push([src?.kind === 'ninja' ? 'Last fetched' : 'Pasted', ageText(when), isStale(when)]);
+    if (src?.kind === 'ninja') meta.push(['Loaded', ageText(b.importedAt)]);
   }
-  box.textContent = parts.join(' · ') + (stale ? ' · consider refreshing' : '');
-  box.classList.toggle('stale', stale);
+  $('p-meta').replaceChildren(...meta.map(([k, val, stale]) => el('div', '', el('dt', '', k), el('dd', stale ? 'stale' : '', val + (stale ? ' · refresh?' : '')))));
   $('hero-refresh').hidden = !v.settings.ninja;
 }
 
+// ---------- Render ----------
+
 function render(v: BuildView) {
+  if (v.build?.code !== current?.build?.code) shownSet = null;
   current = v;
+
   const engine = $('engine-state');
   engine.className = `engine-state ${v.engine}`;
   engine.querySelector('span')!.textContent =
@@ -240,25 +414,11 @@ function render(v: BuildView) {
   $('char').hidden = !ov;
 
   if (ov) {
-    const cls = ov.ascendancy && ov.ascendancy !== 'None' ? ov.ascendancy : ov.className ?? '';
-    $('hero-title').replaceChildren(el('span', 'lvl', `Level ${ov.level ?? '?'}`), ` ${cls}`);
-    $('hero-sub').textContent = [
-      ov.mainSkill && `Main skill: ${ov.mainSkill}`,
-      ov.weaponSet === 2 && 'uses weapon set 2',
-      v.build?.source.kind === 'ninja' && v.build.source.character,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    renderFreshness(v);
-    renderKpis(ov);
-    renderResistances(ov.stats);
-    renderSkills(ov);
-    renderDefences(ov.stats);
-    renderAttributes(ov.stats);
-    $('gear').replaceChildren(...ov.gear.map((g) => itemCard(g.slot, g.item)));
-    $('jewels-card').hidden = ov.jewels.length === 0;
-    $('jewel-count').textContent = `${ov.jewels.length}`;
-    $('jewels').replaceChildren(...ov.jewels.map((j) => itemCard('Jewel', j.item)));
+    renderHeader(v, ov);
+    renderEquipment(ov, v.build?.icons ?? []);
+    renderStats(ov);
+    renderGemGroups(ov);
+    renderPassives(ov);
   }
 
   // Build source page
@@ -279,9 +439,20 @@ for (const id of ['empty-paste', 'hero-paste', 'source-paste']) {
   b.addEventListener('click', () => void paste(b).then(() => current?.overview && showPage('character')));
 }
 
+$('hero-copy').addEventListener('click', () =>
+  void api.copyBuild().then((ok) => message(ok ? 'Build code copied – paste it into Path of Building (Import/Export Build).' : 'No build loaded.', ok ? 'ok' : 'error')),
+);
+
 const refresh = (btn: HTMLButtonElement) => run(btn, () => api.refreshNinja(), 'Loaded the latest state from poe.ninja.');
 $<HTMLButtonElement>('hero-refresh').addEventListener('click', (e) => void refresh(e.currentTarget as HTMLButtonElement));
 $<HTMLButtonElement>('ninja-refresh').addEventListener('click', (e) => void refresh(e.currentTarget as HTMLButtonElement));
+
+for (const b of document.querySelectorAll<HTMLButtonElement>('#set-toggle button')) {
+  b.addEventListener('click', () => {
+    shownSet = Number(b.dataset.set);
+    if (current?.overview) renderEquipment(current.overview, current.build?.icons ?? []);
+  });
+}
 
 const linkInput = $<HTMLInputElement>('ninja-link');
 const connect = () =>
@@ -296,4 +467,4 @@ $('ninja-open').addEventListener('click', () => void api.openNinja());
 api.onView(render);
 void api.getView().then(render);
 // Keep the "x hours ago" texts current.
-setInterval(() => current && renderFreshness(current), 60_000);
+setInterval(() => current?.overview && renderHeader(current, current.overview), 60_000);

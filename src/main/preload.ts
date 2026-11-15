@@ -10,6 +10,8 @@ const api = {
   },
   /** Reads a Path of Building code from the clipboard (once, on click) and calculates it. */
   pasteBuild: (): Promise<Result> => ipcRenderer.invoke('build:paste'),
+  /** Copies the current build code to the clipboard. */
+  copyBuild: (): Promise<boolean> => ipcRenderer.invoke('build:copy'),
   setNinjaLink: (link: string): Promise<Result> => ipcRenderer.invoke('ninja:set', link),
   clearNinja: (): Promise<Result> => ipcRenderer.invoke('ninja:clear'),
   refreshNinja: (): Promise<Result> => ipcRenderer.invoke('ninja:refresh'),

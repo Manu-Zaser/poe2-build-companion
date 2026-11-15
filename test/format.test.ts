@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageText, compact, fmt, isStale } from '../src/renderer/format';
+import { ageText, compact, fmt, isStale, short } from '../src/renderer/format';
 
 const now = Date.parse('2026-11-15T12:00:00Z');
 
@@ -10,6 +10,9 @@ describe('format', () => {
     expect(compact(471810.1)).toBe('471.8k');
     expect(compact(1_254_000)).toBe('1.25M');
     expect(compact(950)).toBe('950');
+    expect(short(3657)).toBe('3.7k');
+    expect(short(12_600)).toBe('13k');
+    expect(short(950.4)).toBe('950');
   });
 
   it('describes ages', () => {

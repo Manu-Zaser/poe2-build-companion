@@ -11,11 +11,20 @@ Status: **Phase 1 (character overview) – done.** Next: phase 2, item check per
 
 ## What it does (phase 1)
 
-- **Character overview:** equipped items per slot with their modifiers, life / energy shield / mana / spirit,
-  effective HP and max hit per damage type, evasion, armour, deflect, movement speed, attributes vs. requirements.
-- **Resistances** with their actual cap (75 % or raised by max-resistance modifiers) and a warning when below it.
-- **Damage per skill** for every enabled skill group, each calculated as if it were the main skill (the number PoB
-  shows when you select it), main skill highlighted.
+The character page is laid out like a character profile on poe.ninja:
+
+- **Header:** league, character, level and class, account, when poe.ninja last fetched the character, buttons to
+  copy the build code for Path of Building, paste a code or refresh.
+- **Equipment** in the in-game arrangement with item pictures (from the poe.ninja profile; with a pasted code the
+  item names are shown instead), weapon set I/II toggle, flasks and charms, jewels. Hovering an item shows its
+  modifiers like the in-game tooltip.
+- **Stats column:** character (attributes, movement speed, rarity, charges), defensive (life, ES, mana, spirit,
+  armour, evasion, deflection, resistances, effective HP, max hit per damage type), recovery (regen, leech,
+  ES recharge) and main skills (DPS, attack rate, crit, hit chance, projectiles, radius). Warnings for resistances
+  below the cap, unmet attribute requirements and over-reserved spirit.
+- **Skills** with their gems (level, quality, supports), main skill highlighted.
+- **Ascendancy & keystones** with their effects and point counts.
+- **DPS per skill** is calculated as if each skill were the main skill (the number PoB shows when you select it).
 - **Build source:**
   - **poe.ninja** (recommended): paste your character link (profile or builds page) once, then *Refresh* loads the latest state with one
     click. Requires a public profile; the state is as fresh as poe.ninja's last check, which is shown.
@@ -23,7 +32,8 @@ Status: **Phase 1 (character overview) – done.** Next: phase 2, item check per
 - Shows how old the loaded state is and suggests refreshing after three days.
 
 Nothing is sent to the game, no hotkeys yet, the clipboard is never read in the background. PoB's OAuth client id is
-never used; there are no requests to GGG at all.
+never used and no GGG API is called; the only connection to GGG is loading the item pictures from their public image
+CDN (web.poecdn.com), with the links poe.ninja provides.
 
 ## Running from source
 
