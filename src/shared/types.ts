@@ -119,6 +119,17 @@ export interface StoredBuild {
   leagueName?: string;
   /** Item pictures from the poe.ninja profile (only for poe.ninja). */
   icons?: ItemIcon[];
+  /** Items equipped via "Equip in my build" since the code was taken; applied on every load. */
+  equips?: EquipRecord[];
+}
+
+export interface EquipRecord {
+  slot: string;
+  /** Item text as copied in game. */
+  itemText: string;
+  name: string;
+  /** ISO time it was equipped. */
+  at: string;
 }
 
 export interface ItemIcon {
@@ -144,6 +155,10 @@ export interface NinjaCharacter {
 
 export interface Settings {
   ninja?: NinjaCharacter;
+  /** Item check hotkey (Electron accelerator), e.g. "Alt+D". */
+  hotkey: string;
+  /** Where the user left the overlay. */
+  overlayPosition?: { x: number; y: number };
 }
 
 export interface StoredState {
@@ -159,4 +174,11 @@ export interface BuildView {
   engine: 'starting' | 'ready' | 'failed';
   engineError?: string;
   loadMs?: number;
+  /** false if another program already uses the hotkey. */
+  hotkeyActive: boolean;
 }
+
+/** What the overlay shows. */
+export type OverlayContent =
+  | { kind: 'check'; item: ItemInfo; verdicts: import('./verdict').SlotVerdict[]; mainSkill?: string; ms: number; equipped?: string }
+  | { kind: 'error'; message: string };

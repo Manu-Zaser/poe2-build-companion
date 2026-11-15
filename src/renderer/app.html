@@ -30,6 +30,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5" /></svg>
         <span>Build source</span>
       </button>
+      <button class="nav-item" data-page="check">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="11" rx="2" /><path d="M7 11h2M11 11h2M15 11h2M8 14.5h8" /></svg>
+        <span>Item check</span>
+      </button>
     </nav>
 
     <div class="sidebar-foot">
@@ -70,7 +74,13 @@
               <h2 class="char-name" id="p-name"></h2>
               <div class="char-class" id="p-class"></div>
             </div>
-            <dl class="profile-meta" id="p-meta"></dl>
+            <div class="profile-mid">
+              <dl class="profile-meta" id="p-meta"></dl>
+              <div class="local-changes" id="local-changes" hidden>
+                <span id="local-changes-text"></span>
+                <button class="link-btn" id="reset-equips" title="Undo the items equipped via the item check">Reset</button>
+              </div>
+            </div>
             <div class="profile-actions">
               <button class="btn sm" id="hero-copy" title="Copy the build code for Path of Building">Copy PoB code</button>
               <button class="btn sm" id="hero-paste" title="Read a Path of Building code from the clipboard">Paste code</button>
@@ -159,6 +169,28 @@
             The clipboard is read once, only when you click.
           </p>
           <div class="row"><button class="btn" id="source-paste">Paste build code</button></div>
+        </div>
+      </section>
+      <!-- ITEM CHECK -->
+      <section class="page" data-page="check" data-title="Item check" data-sub="Is the item you just found better than what you wear?">
+        <div class="card pad">
+          <div class="card-head"><h2>Hotkey</h2><span class="card-note" id="hk-state"></span></div>
+          <div class="hk-row">
+            <div class="hk-keys" id="hk-keys"></div>
+            <button class="btn" id="hk-record">Change</button>
+          </div>
+          <p class="hk-error" id="hk-error"></p>
+          <p class="section-hint">Combine with Ctrl or Alt, or use an F-key. Each press sends exactly one copy command to the game.</p>
+        </div>
+
+        <div class="card pad">
+          <div class="card-head"><h2>How it works</h2></div>
+          <ol class="steps">
+            <li><b>Hover over an item in game</b> and press the hotkey. The item is copied once and checked against your build in Path of Building.</li>
+            <li><b>The overlay answers:</b> better, worse or a trade-off, with the change in DPS of your main skill, effective HP, life and resistances – and warnings first, e.g. when a resistance falls below the cap or an attribute requirement is no longer met. Rings are checked in both slots.</li>
+            <li><b>Equip in my build</b> puts the item into the local copy of your build, without a new import. The character page shows how many items were changed since the last import.</li>
+          </ol>
+          <p class="section-hint">The overlay stays open until you close it (× or Esc). Drag it anywhere – it remembers the position. <button class="link-btn" id="overlay-reset">Reset position</button></p>
         </div>
       </section>
     </main>

@@ -1,5 +1,6 @@
 import type { Api } from '../main/preload';
 import type { BuildView, GearSlot, ItemIcon, ItemInfo, Overview, SkillDps, Stats } from '../shared/types';
+import { acceleratorFromEvent, formatHotkey, validateHotkey } from '../shared/hotkey';
 import { ageText, compact, fmt, isStale, short } from './format';
 
 declare global {
@@ -19,6 +20,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, ...chil
 let current: BuildView | null = null;
 /** Weapon set shown in the equipment view (null = the build's active set). */
 let shownSet: number | null = null;
+/** Slots holding an item equipped here via the item check (not in the imported build). */
+let localSlots = new Set<string>();
 
 // ---------- Navigation ----------
 
@@ -85,7 +88,10 @@ const INVENTORY_IDS: Record<string, string> = {
 };
 
 function iconFor(item: ItemInfo, slot: string, icons: ItemIcon[]): string | undefined {
-  return (icons.find((i) => i.name === item.name) ?? icons.find((i) => i.inventoryId === INVENTORY_IDS[slot]))?.url;
+  const byName = icons.find((i) => i.name === item.name);
+  // A locally equipped item has no picture of its own – never show the replaced item's picture.
+  if (byName || localSlots.has(slot)) return byName?.url;
+  return icons.find((i) => i.inventoryId === INVENTORY_IDS[slot])?.url;
 }
 
 const rarityCls = (item: ItemInfo) => `rarity-${item.rarity.toLowerCase()}`;
@@ -140,6 +146,11 @@ function itemCell(item: ItemInfo | null, slot: string, icons: ItemIcon[], label:
     cell.append(nameTile());
   }
   if (item.corrupted) cell.append(el('i', 'corrupt'));
+  if (localSlots.has(slot)) {
+    const dot = el('i', 'local');
+    dot.title = 'Equipped here via the item check';
+    cell.append(dot);
+  }
   attachTooltip(cell, item);
   return cell;
 }
@@ -395,13 +406,65 @@ function renderHeader(v: BuildView, ov: Overview) {
   }
   $('p-meta').replaceChildren(...meta.map(([k, val, stale]) => el('div', '', el('dt', '', k), el('dd', stale ? 'stale' : '', val + (stale ? ' · refresh?' : '')))));
   $('hero-refresh').hidden = !v.settings.ninja;
+
+  const equips = b?.equips ?? [];
+  $('local-changes').hidden = equips.length === 0;
+  $('local-changes-text').textContent = `${equips.length} item${equips.length === 1 ? '' : 's'} changed since`;
+  $('local-changes').title = equips.map((e) => `${e.slot}: ${e.name} (${ageText(e.at)})`).join('\n');
 }
+
+// ---------- Item check page ----------
+
+function renderHotkey(v: BuildView) {
+  if (recording) return;
+  $('hk-keys').className = 'hk-keys';
+  $('hk-keys').replaceChildren(
+    ...formatHotkey(v.settings.hotkey).flatMap((k, i) => [i ? el('span', 'plus', '+') : '', el('kbd', 'key lg', k)]).filter((x): x is HTMLElement => x !== ''),
+  );
+  const state = $('hk-state');
+  state.textContent = v.hotkeyActive ? 'active' : 'not active – used by another program';
+  state.style.color = v.hotkeyActive ? 'var(--ok)' : '#f0a597';
+}
+
+let recording = false;
+function startRecording() {
+  recording = true;
+  $('hk-error').textContent = '';
+  $('hk-keys').className = 'hk-keys recording';
+  $('hk-keys').textContent = 'Press the new key combination… (Esc to cancel)';
+  $('hk-record').textContent = 'Cancel';
+}
+function stopRecording() {
+  recording = false;
+  $('hk-record').textContent = 'Change';
+  if (current) renderHotkey(current);
+}
+window.addEventListener('keydown', (e) => {
+  if (!recording) return;
+  e.preventDefault();
+  if (e.key === 'Escape') return stopRecording();
+  const acc = acceleratorFromEvent(e);
+  if (!acc) return; // only modifiers so far
+  const problem = validateHotkey(acc);
+  if (problem) {
+    $('hk-error').textContent = problem;
+    return;
+  }
+  void api.setHotkey(acc).then((r) => {
+    stopRecording();
+    if (!r.ok) $('hk-error').textContent = r.error;
+    render(r.view);
+    if (r.ok) message(`Item check hotkey is now ${formatHotkey(acc).join('+')}.`);
+  });
+});
 
 // ---------- Render ----------
 
 function render(v: BuildView) {
   if (v.build?.code !== current?.build?.code) shownSet = null;
   current = v;
+  localSlots = new Set((v.build?.equips ?? []).map((e) => e.slot));
+  renderHotkey(v);
 
   const engine = $('engine-state');
   engine.className = `engine-state ${v.engine}`;
@@ -432,6 +495,12 @@ function render(v: BuildView) {
 }
 
 // ---------- Actions ----------
+
+$('hk-record').addEventListener('click', () => (recording ? stopRecording() : startRecording()));
+$('overlay-reset').addEventListener('click', () => void api.resetOverlayPosition().then(() => message('The overlay appears next to the cursor again.')));
+$<HTMLButtonElement>('reset-equips').addEventListener('click', (e) =>
+  void run(e.currentTarget as HTMLButtonElement, () => api.resetEquips(), 'Local item changes were undone.'),
+);
 
 const paste = (btn: HTMLButtonElement) => run(btn, () => api.pasteBuild(), 'Build code loaded.');
 for (const id of ['empty-paste', 'hero-paste', 'source-paste']) {

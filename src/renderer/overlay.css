@@ -1,0 +1,73 @@
+html, body { background: transparent; overflow: hidden; user-select: none; }
+/* No transparent margin: transparent window areas would still catch clicks meant for the game. */
+#root { display: inline-block; }
+body.dragging, body.dragging * { cursor: grabbing !important; }
+
+/* Over the game the background is busy: brighter text than in the main window. */
+:root { --text: #fffaf0; --muted: #ded5c4; --faint: #b9ae9a; }
+
+.card {
+  position: relative; width: 372px; padding: 12px 14px 12px; border-radius: 12px;
+  background: radial-gradient(140% 80% at 0% 0%, rgba(201,168,92,.10), transparent 55%), rgba(16,14,12,.96);
+  border: 1px solid var(--line-strong);
+  text-shadow: 0 1px 2px rgba(0,0,0,.55);
+  animation: pop .14s ease-out; cursor: grab;
+}
+@keyframes pop { from { opacity: 0; transform: translateY(5px) scale(.985); } }
+
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.title { min-width: 0; }
+.title .n { font: 600 15.5px var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.title .b { font-size: 12px; color: var(--muted); }
+.close { flex: none; border: 0; background: none; color: var(--faint); font-size: 18px; line-height: 1; padding: 0 2px; cursor: pointer; border-radius: 6px; }
+.close:hover { color: var(--text); background: rgba(255,255,255,.08); }
+
+.verdict { margin-top: 10px; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line-strong); background: rgba(255,244,225,.04); }
+.verdict .v { font: 700 15px var(--font-display); }
+.verdict .sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.verdict.better { border-color: rgba(127,176,105,.55); background: rgba(127,176,105,.10); }
+.verdict.better .v { color: #a9d48f; }
+.verdict.worse { border-color: rgba(217,112,95,.45); background: rgba(217,112,95,.08); }
+.verdict.worse .v { color: #f0a597; }
+.verdict.mixed .v { color: var(--gold-bright); }
+.verdict.same .v { color: var(--muted); }
+.verdict.warning { border-color: rgba(217,112,95,.6); background: rgba(217,112,95,.12); }
+.verdict.warning .v { color: #ffb4a6; }
+
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.kpi { padding: 6px 9px; border-radius: 8px; background: rgba(255,244,225,.04); border: 1px solid var(--line); }
+.kpi span { display: block; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi strong { font: 600 16px var(--font-display); font-variant-numeric: tabular-nums; }
+
+.warns { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.warns li { font-size: 12.5px; color: #ffb4a6; padding-left: 18px; position: relative; }
+.warns li::before { content: "⚠"; position: absolute; left: 0; }
+
+.changes { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin: 8px 0 0; font-size: 12.5px; }
+.changes dt { color: var(--muted); }
+.changes dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.up { color: #a9d48f; }
+.down { color: #f0a597; }
+.flat { color: var(--muted); }
+
+.slot-block + .slot-block { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.slot-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.slot-line b { color: var(--text); font-weight: 600; }
+.slot-block:first-child .slot-line { margin-top: 0; }
+.others { margin-top: 10px; font-size: 12px; color: var(--faint); }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line-strong); background: var(--surface-2);
+  padding: 4px 10px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--text);
+}
+.btn:hover { border-color: var(--gold-deep); background: var(--surface-3); }
+.btn.primary { background: linear-gradient(180deg, #d9b768, #b08f45); border-color: #c9a85c; color: #1a140a; text-shadow: none; }
+.btn:disabled { opacity: .5; cursor: default; }
+.done { color: #a9d48f; font-weight: 600; font-size: 12px; }
+
+.foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 11px; color: var(--faint); }
+.foot a { color: var(--faint); text-decoration: underline; cursor: pointer; }
+.foot a:hover { color: var(--text); }
+
+.card-error .msg { margin-top: 8px; font-size: 13px; color: var(--muted); }

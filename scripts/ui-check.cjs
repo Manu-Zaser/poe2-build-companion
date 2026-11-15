@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 module.exports = (out) => {
+  process.env.COMPANION_TEST = '1'; // no global hotkey during tests
   const root = path.join(__dirname, '..');
   const profile = path.join(out, 'profile');
   fs.rmSync(profile, { recursive: true, force: true });
@@ -35,11 +36,12 @@ module.exports = (out) => {
   const text = (wc, id) => js(wc, `document.getElementById(${JSON.stringify(id)}).innerText`);
 
   app.on('browser-window-created', (_e, win) => {
-    win.setSize(1360, 960);
     const wc = win.webContents;
-    wc.setBackgroundThrottling(false);
-    wc.on('console-message', (e) => log.push(`console: ${e.message}`));
     wc.once('did-finish-load', async () => {
+      if (!wc.getURL().endsWith('app.html')) return; // only the main window, not the overlay
+      win.setSize(1360, 960);
+      wc.setBackgroundThrottling(false);
+      wc.on('console-message', (e) => log.push(`console: ${e.message}`));
       try {
         await wc.insertCSS('*, *::before { animation: none !important; transition: none !important; }');
         await until(wc, `document.getElementById('engine-state').classList.contains('ready')`);

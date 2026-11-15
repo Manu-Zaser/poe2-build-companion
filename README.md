@@ -3,13 +3,31 @@
 Desktop tool for Path of Exile 2 that knows your character and the build you follow, and answers one question
 for an item you just found: *is it better than what I wear, and does it fit my build?*
 
-Status: **Phase 1 (character overview) – done.** Next: phase 2, item check per hotkey.
+Status: **Phase 2 (item check) – done.** Next: phase 3, target build from a guide ("does it fit my build?").
 
 > This product isn't affiliated with or endorsed by Grinding Gear Games in any way.
 > Uses [Path of Building PoE2](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2) (MIT, © David Gowor)
 > as its calculation engine, unchanged, as a git submodule.
 
-## What it does (phase 1)
+## Item check (phase 2)
+
+Hover over an item in game and press the hotkey (default **Alt+D**, changeable on the *Item check* page). The
+overlay answers within a fraction of a second:
+
+- **Verdict:** better for your build, worse, a trade-off or about the same – from the change in DPS of your main skill
+  and your effective health pool, calculated by Path of Building with the item in the slot.
+- **Hard warnings first:** a resistance falls (further) below the cap, an attribute requirement is no longer met,
+  spirit no longer covers your reservations. Any of these makes the verdict *Careful*.
+- **Changes:** DPS, effective HP, life, energy shield, mana, resistances, max physical hit, evasion, armour,
+  deflection, free spirit and attributes. Rings are checked in both slots (best first), weapons in the weapon set
+  your build uses.
+- **Equip in my build** puts the item into the local copy of your build – no new import needed. The character page
+  shows "1 item changed since" with a *Reset* button; local items are applied on top of every load and kept after a
+  poe.ninja refresh until poe.ninja has seen the change.
+
+The overlay stays open until you close it (× or Esc), can be dragged from anywhere and remembers its position.
+
+## Character page (phase 1)
 
 The character page is laid out like a character profile on poe.ninja:
 
@@ -31,7 +49,9 @@ The character page is laid out like a character profile on poe.ninja:
   - **Path of Building code:** *Paste build code* reads the clipboard once, on click – works with private profiles.
 - Shows how old the loaded state is and suggests refreshing after three days.
 
-Nothing is sent to the game, no hotkeys yet, the clipboard is never read in the background. PoB's OAuth client id is
+**Game rules:** one hotkey press sends exactly one copy command (Ctrl+Alt+C) to the game and reads the clipboard
+once; the previous clipboard content is restored. No memory reading, no automation, no game files touched. Otherwise
+the clipboard is only read when you click *Paste build code*. PoB's OAuth client id is
 never used and no GGG API is called; the only connection to GGG is loading the item pictures from their public image
 CDN (web.poecdn.com), with the links poe.ninja provides.
 
@@ -48,8 +68,11 @@ build code, print stats, compare items). Invisible UI test (hidden window, own p
 
 ```bash
 npm run build
-npx electron scripts/run-hidden.cjs scripts/ui-check.cjs <output folder>
+npx electron scripts/run-hidden.cjs scripts/ui-check.cjs <output folder>     # character page
+npx electron scripts/run-hidden.cjs scripts/check-ui.cjs <output folder>     # item check and overlay
 ```
+
+The tests never register the global hotkey and never send keys; the item check is called with fixture texts.
 
 ## Layout
 
@@ -57,10 +80,11 @@ npx electron scripts/run-hidden.cjs scripts/ui-check.cjs <output folder>
 vendor/PathOfBuilding-PoE2   PoB PoE2, unchanged (git submodule)
 src/engine/host.ts           Engine process: loads PoB's own LuaJIT (runtime/lua51.dll) via koffi; JSON lines on
                              stdin/stdout. Started by the app as Electron in Node mode – no extra runtime.
-src/engine/bridge.lua        Lua side: boots PoB headless; commands "load", "overview", "compare"
-src/main/                    Electron main process: window, storage, engine client, poe.ninja refresh
-src/shared/                  Build code decoding, poe.ninja lookup, shared types
-src/renderer/                Character and build source pages
+src/engine/bridge.lua        Lua side: boots PoB headless; commands "load", "overview", "compare", "equip"
+src/main/                    Electron main process: window, storage, engine client, poe.ninja refresh, hotkey,
+                             overlay window, one copy keystroke (win32.ts, from Price Check)
+src/shared/                  Build code decoding, poe.ninja lookup, verdict and warnings, hotkey helpers, types
+src/renderer/                Character, build source and item check pages; overlay
 ```
 
 Settings and the last build are stored in `%APPDATA%\poe2-build-companion\companion.json`.

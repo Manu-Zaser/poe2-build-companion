@@ -248,26 +248,72 @@ end
 
 local handlers = {}
 
+-- Item from text copied in game (or PoB's own item text). Errors if PoB does not know the base.
+local function parseItem(text)
+	local item = new("Item"):Item(text)
+	if not item.base then
+		error("Path of Building does not know this item base", 0)
+	end
+	item:NormaliseQuality()
+	item:BuildModList()
+	return item
+end
+
+-- Puts items into slots of the loaded build, like equipping them in PoB, and recalculates.
+-- Returns one result per entry: { ok = true } or { error = "..." }.
+local function applyEquips(equips)
+	local itemsTab = build.itemsTab
+	local results = {}
+	for i, e in ipairs(equips or {}) do
+		local ok, err = pcall(function()
+			local slot = itemsTab.slots[e.slot]
+			if not slot then
+				error("unknown slot " .. tostring(e.slot), 0)
+			end
+			local item = parseItem(e.itemText)
+			if not itemsTab:IsItemValidForSlot(item, e.slot) then
+				error("this item does not fit into " .. e.slot, 0)
+			end
+			itemsTab:AddItem(item, true)
+			slot:SetSelItemId(item.id)
+		end)
+		results[i] = ok and { ok = true } or { error = tostring(err) }
+	end
+	if #results > 0 then
+		itemsTab:PopulateSlots()
+		build.buildFlag = true
+		runCallback("OnFrame")
+	end
+	return results
+end
+
 function handlers.load(req)
 	loadBuildFromXML(req.xml, req.name or "")
 	if not build.calcsTab.mainOutput then
 		error("The build could not be calculated")
 	end
-	return overview()
+	local equips = applyEquips(req.equips)
+	local res = overview()
+	res.equips = #equips > 0 and equips or JSON_NULL
+	return res
 end
 
 function handlers.overview()
 	return overview()
 end
 
+-- Equips one item in the loaded build ("Equip in my build").
+function handlers.equip(req)
+	local r = applyEquips({ { slot = req.slot, itemText = req.itemText } })[1]
+	if r.error then
+		error(r.error, 0)
+	end
+	return overview()
+end
+
 -- Compares an item (game copy text) against what is equipped, in every slot it fits.
 function handlers.compare(req)
-	local item = new("Item"):Item(req.itemText)
-	if not item.base then
-		return { error = "Path of Building does not know this item base" }
-	end
-	item:NormaliseQuality()
-	item:BuildModList()
+	local item = parseItem(req.itemText)
 
 	local itemsTab = build.itemsTab
 	local calcFunc, base = build.calcsTab:GetMiscCalculator()
