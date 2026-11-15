@@ -1,0 +1,17 @@
+{
+  "name": "poe2-build-companion",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PoE2 Build Companion – Phase 0 feasibility spike (Path of Building PoE2 headless)",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "spike": "node spike/run.mjs"
+  },
+  "dependencies": {
+    "koffi": "^3.3.8"
+  },
+  "allowScripts": {
+    "koffi@3.3.8": true
+  }
+}
