@@ -106,6 +106,8 @@ export interface Comparison {
 /** Where the current build code came from. */
 export type BuildSource =
   | { kind: 'ninja'; account: string; character: string; league: string }
+  /** A build file Path of Building 2 saved on this computer; reloaded whenever PoB saves it. */
+  | { kind: 'file'; path: string; name: string }
   | { kind: 'paste' };
 
 export interface StoredBuild {
@@ -113,7 +115,7 @@ export interface StoredBuild {
   source: BuildSource;
   /** ISO time the code was taken (clipboard paste or poe.ninja fetch). */
   importedAt: string;
-  /** ISO time poe.ninja last checked the character (only for poe.ninja). */
+  /** ISO time poe.ninja last checked the character, or when PoB saved the build file. */
   snapshotAt?: string;
   /** League display name from poe.ninja, e.g. "Forbidden Rites". */
   leagueName?: string;
@@ -135,6 +137,10 @@ export interface EquipRecord {
 export interface ItemIcon {
   /** "Title, Base" for rare/unique items, the full name otherwise – matches PoB's item name. */
   name: string;
+  /** Base type, e.g. "Barbed Bracers" – rare and magic items look like their base. */
+  base?: string;
+  /** true for unique items – their picture is their own, not the base's. */
+  unique?: boolean;
   /** Game inventory id: Weapon, Offhand, Weapon2, Offhand2, Helm, BodyArmour, Gloves, Boots, Amulet, Ring, Ring2, Belt, Flask. */
   inventoryId: string;
   /** Position for flasks and charms (0-based). */
@@ -176,6 +182,16 @@ export interface BuildView {
   loadMs?: number;
   /** false if another program already uses the hotkey. */
   hotkeyActive: boolean;
+}
+
+/** A build file saved by Path of Building 2, as listed on the Build source page. */
+export interface PobFileEntry {
+  path: string;
+  name: string;
+  /** ISO time it was last saved. */
+  savedAt: string;
+  level?: number;
+  className?: string;
 }
 
 /** What the overlay shows. */

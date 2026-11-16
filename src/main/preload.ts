@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { BuildView, OverlayContent } from '../shared/types';
+import type { BuildView, OverlayContent, PobFileEntry } from '../shared/types';
 
 type Result = { ok: true; view: BuildView } | { ok: false; error: string; view: BuildView };
 
@@ -19,6 +19,14 @@ const api = {
   clearNinja: (): Promise<Result> => ipcRenderer.invoke('ninja:clear'),
   refreshNinja: (): Promise<Result> => ipcRenderer.invoke('ninja:refresh'),
   openNinja: (): Promise<void> => ipcRenderer.invoke('ninja:open'),
+  /** Build files saved by Path of Building 2. */
+  listPobFiles: (): Promise<{ dir: string; files: PobFileEntry[] }> => ipcRenderer.invoke('pobfile:list'),
+  usePobFile: (path: string): Promise<Result> => ipcRenderer.invoke('pobfile:use', path),
+  choosePobFile: (): Promise<Result | null> => ipcRenderer.invoke('pobfile:choose'),
+  openPobFolder: (): Promise<void> => ipcRenderer.invoke('pobfile:open-folder'),
+  onNotice: (cb: (n: { text: string; kind: 'ok' | 'error' }) => void) => {
+    ipcRenderer.on('notice', (_e, n: { text: string; kind: 'ok' | 'error' }) => cb(n));
+  },
   setHotkey: (acc: string): Promise<Result> => ipcRenderer.invoke('settings:hotkey', acc),
   resetOverlayPosition: (): Promise<Result> => ipcRenderer.invoke('settings:reset-overlay'),
 

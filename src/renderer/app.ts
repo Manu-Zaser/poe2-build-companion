@@ -1,5 +1,5 @@
 import type { Api } from '../main/preload';
-import type { BuildView, GearSlot, ItemIcon, ItemInfo, Overview, SkillDps, Stats } from '../shared/types';
+import type { BuildView, GearSlot, ItemIcon, ItemInfo, Overview, PobFileEntry, SkillDps, Stats } from '../shared/types';
 import { acceleratorFromEvent, formatHotkey, validateHotkey } from '../shared/hotkey';
 import { ageText, compact, fmt, isStale, short } from './format';
 
@@ -87,10 +87,20 @@ const INVENTORY_IDS: Record<string, string> = {
   Belt: 'Belt',
 };
 
+/**
+ * Picture for an item: the same item on the poe.ninja profile; otherwise, for rare and magic items, any
+ * item of the same base (they look like their base in game); for builds from poe.ninja itself also the
+ * item in the same slot. Uniques only ever get their own picture.
+ */
 function iconFor(item: ItemInfo, slot: string, icons: ItemIcon[]): string | undefined {
   const byName = icons.find((i) => i.name === item.name);
-  // A locally equipped item has no picture of its own – never show the replaced item's picture.
-  if (byName || localSlots.has(slot)) return byName?.url;
+  if (byName) return byName.url;
+  if (item.rarity !== 'UNIQUE' && item.rarity !== 'RELIC') {
+    const byBase = icons.find((i) => i.base === item.base && !i.unique);
+    if (byBase) return byBase.url;
+  }
+  // A locally equipped item never shows the replaced item's picture.
+  if (current?.build?.source.kind !== 'ninja' || localSlots.has(slot)) return undefined;
   return icons.find((i) => i.inventoryId === INVENTORY_IDS[slot])?.url;
 }
 
@@ -393,19 +403,22 @@ function renderHeader(v: BuildView, ov: Overview) {
   const b = v.build;
   const src = b?.source;
   const cls = ov.ascendancy && ov.ascendancy !== 'None' ? ov.ascendancy : ov.className ?? '';
-  $('p-league').textContent = src?.kind === 'ninja' ? `${b?.leagueName ?? leagueName(src.league)} league` : 'From a Path of Building code';
-  $('p-name').textContent = src?.kind === 'ninja' ? src.character : cls || 'Character';
+  $('p-league').textContent =
+    src?.kind === 'ninja' ? `${b?.leagueName ?? leagueName(src.league)} league` : src?.kind === 'file' ? 'Path of Building 2 file' : 'From a Path of Building code';
+  $('p-name').textContent = src?.kind === 'ninja' ? src.character : src?.kind === 'file' ? src.name : cls || 'Character';
   $('p-class').replaceChildren(el('b', '', `Level ${ov.level ?? '?'}`), ` ${cls}`);
 
   const meta: [string, string, boolean?][] = [];
   if (src?.kind === 'ninja') meta.push(['Account', src.account.replace(/-(\d+)$/, '#$1')]);
   if (b) {
-    const when = src?.kind === 'ninja' ? b.snapshotAt ?? b.importedAt : b.importedAt;
-    meta.push([src?.kind === 'ninja' ? 'Last fetched' : 'Pasted', ageText(when), isStale(when)]);
+    const when = src?.kind === 'paste' ? b.importedAt : b.snapshotAt ?? b.importedAt;
+    const label = src?.kind === 'ninja' ? 'Last fetched' : src?.kind === 'file' ? 'Saved in PoB' : 'Pasted';
+    meta.push([label, ageText(when), isStale(when)]);
     if (src?.kind === 'ninja') meta.push(['Loaded', ageText(b.importedAt)]);
+    if (src?.kind === 'file') meta.push(['Updates', 'on every save']);
   }
-  $('p-meta').replaceChildren(...meta.map(([k, val, stale]) => el('div', '', el('dt', '', k), el('dd', stale ? 'stale' : '', val + (stale ? ' · refresh?' : '')))));
-  $('hero-refresh').hidden = !v.settings.ninja;
+  $('p-meta').replaceChildren(...meta.map(([k, val, stale]) => el('div', '', el('dt', '', k), el('dd', stale ? 'stale' : '', val + (stale ? ' · import again?' : '')))));
+  $('hero-refresh').hidden = !(v.settings.ninja && src?.kind === 'ninja');
 
   const equips = b?.equips ?? [];
   $('local-changes').hidden = equips.length === 0;
@@ -492,9 +505,68 @@ function render(v: BuildView) {
     const b = v.build?.source.kind === 'ninja' ? v.build : undefined;
     $('ninja-meta').textContent = `League ${ninja.league}` + (b ? ` · loaded ${ageText(b.importedAt)}` : ' · not loaded yet');
   }
+  renderPobFiles();
+}
+
+// ---------- Path of Building 2 files ----------
+
+let pobFiles: { dir: string; files: PobFileEntry[] } | null = null;
+
+async function loadPobFiles() {
+  pobFiles = await api.listPobFiles();
+  renderPobFiles();
+}
+
+function renderPobFiles() {
+  if (!pobFiles) return;
+  const using = current?.build?.source.kind === 'file' ? current.build.source.path : null;
+  $('pob-dir').textContent = pobFiles.dir;
+  $('pob-dir').title = pobFiles.dir;
+  if (pobFiles.files.length === 0) {
+    $('pob-files').replaceChildren(el('p', 'empty-note', 'No Path of Building 2 builds found in this folder yet. Save your build in PoB (Ctrl+S) and click "Refresh list", or choose the file.'));
+    return;
+  }
+  $('pob-files').replaceChildren(
+    ...pobFiles.files.slice(0, 8).map((f) => {
+      const isCurrent = f.path === using;
+      const info = [f.level ? `Level ${f.level}` : '', f.className ?? '', `saved ${ageText(f.savedAt)}`].filter(Boolean).join(' · ');
+      let action: HTMLElement;
+      if (isCurrent) {
+        action = el('span', 'watching', '● Watching');
+      } else {
+        const b = el('button', 'btn sm primary', 'Use');
+        b.addEventListener('click', () =>
+          void run(b, () => api.usePobFile(f.path), `Loaded ${f.name} – it reloads whenever you save it in Path of Building.`).then(() => {
+            if (current?.build?.source.kind === 'file') showPage('character');
+          }),
+        );
+        action = b;
+      }
+      return el('div', `pob-file${isCurrent ? ' current' : ''}`, el('div', '', el('b', '', f.name), el('small', '', info)), action);
+    }),
+  );
 }
 
 // ---------- Actions ----------
+
+$('pob-reload-list').addEventListener('click', () => void loadPobFiles());
+$('pob-folder').addEventListener('click', () => void api.openPobFolder());
+$<HTMLButtonElement>('pob-choose').addEventListener('click', (e) => {
+  const btn = e.currentTarget as HTMLButtonElement;
+  void api.choosePobFile().then((res) => {
+    if (!res) return; // cancelled
+    render(res.view);
+    if (res.ok) {
+      message('Build file loaded – it reloads whenever you save it in Path of Building.');
+      showPage('character');
+    } else message(res.error, 'error');
+    void loadPobFiles();
+    btn.blur();
+  });
+});
+// The list is read when the page is opened (files change while the app runs).
+document.querySelector('.nav-item[data-page=source]')?.addEventListener('click', () => void loadPobFiles());
+api.onNotice((n) => message(n.text, n.kind));
 
 $('hk-record').addEventListener('click', () => (recording ? stopRecording() : startRecording()));
 $('overlay-reset').addEventListener('click', () => void api.resetOverlayPosition().then(() => message('The overlay appears next to the cursor again.')));

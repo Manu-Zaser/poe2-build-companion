@@ -261,3 +261,13 @@ h3 { margin: 0 0 8px; font: 600 11px var(--font-display); letter-spacing: .1em; 
 .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--muted); }
 .steps b { color: var(--text); font-weight: 600; }
 .hk-error { margin: 6px 0 0; color: var(--bad); font-size: 12.5px; min-height: 1.2em; }
+
+/* ---------- PoB build files ---------- */
+.pob-files { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.pob-file { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+.pob-file.current { border-color: var(--gold-deep); background: linear-gradient(180deg, rgba(201,168,92,.08), var(--surface)); }
+.pob-file b { font: 600 13.5px var(--font-display); }
+.pob-file small { display: block; font-size: 12px; color: var(--muted); }
+.pob-file .watching { color: var(--ok); font-size: 12px; font-weight: 600; }
+.pob-actions { margin-top: 2px; }
+.pob-actions .card-note { margin-left: auto; max-width: 340px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }

@@ -44,7 +44,14 @@ The character page is laid out like a character profile on poe.ninja:
 - **Ascendancy & keystones** with their effects and point counts.
 - **DPS per skill** is calculated as if each skill were the main skill (the number PoB shows when you select it).
 - **Build source:**
-  - **poe.ninja** (recommended): paste your character link (profile or builds page) once, then *Refresh* loads the latest state with one
+  - **Path of Building 2 file** (always up to date): import your character in PoB 2 (*Items and Skills*, *Passive
+    Tree and Jewels*) and save with Ctrl+S. Choose the build once on the *Build source* page – the app watches the
+    file and reloads it on every save. PoB keeps its own API access; the app only reads the saved file on this
+    computer. The build folder is found automatically (`Documents\Path of Building (PoE2)\Builds` or the folder set
+    in PoB's options). PoB files contain no pictures: if a poe.ninja link is set, the item pictures come from that
+    profile (at most one request every 10 minutes) – by item name, and for rare/magic items also by base type, since
+    they look like their base. Uniques poe.ninja has not seen yet show their name.
+  - **poe.ninja:** paste your character link (profile or builds page) once, then *Refresh* loads the latest state with one
     click. Requires a public profile; the state is as fresh as poe.ninja's last check, which is shown.
   - **Path of Building code:** *Paste build code* reads the clipboard once, on click – works with private profiles.
 - Shows how old the loaded state is and suggests refreshing after three days.
@@ -70,6 +77,7 @@ build code, print stats, compare items). Invisible UI test (hidden window, own p
 npm run build
 npx electron scripts/run-hidden.cjs scripts/ui-check.cjs <output folder>     # character page
 npx electron scripts/run-hidden.cjs scripts/check-ui.cjs <output folder>     # item check and overlay
+npx electron scripts/run-hidden.cjs scripts/file-ui.cjs <output folder>      # PoB file source (own test folder)
 ```
 
 The tests never register the global hotkey and never send keys; the item check is called with fixture texts.
@@ -81,7 +89,8 @@ vendor/PathOfBuilding-PoE2   PoB PoE2, unchanged (git submodule)
 src/engine/host.ts           Engine process: loads PoB's own LuaJIT (runtime/lua51.dll) via koffi; JSON lines on
                              stdin/stdout. Started by the app as Electron in Node mode – no extra runtime.
 src/engine/bridge.lua        Lua side: boots PoB headless; commands "load", "overview", "compare", "equip"
-src/main/                    Electron main process: window, storage, engine client, poe.ninja refresh, hotkey,
+src/main/                    Electron main process: window, storage, engine client, poe.ninja refresh, PoB build
+                             files (pobfile.ts: find, list, read, watch), hotkey,
                              overlay window, one copy keystroke (win32.ts, from Price Check)
 src/shared/                  Build code decoding, poe.ninja lookup, verdict and warnings, hotkey helpers, types
 src/renderer/                Character, build source and item check pages; overlay

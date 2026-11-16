@@ -60,7 +60,7 @@
       <section class="page active" data-page="character" data-title="Character" data-sub="Your gear, defences and damage at a glance">
         <div class="card pad empty-state" id="empty" hidden>
           <h2>No build loaded yet</h2>
-          <p>Link your character on poe.ninja – then one click on <b>Refresh</b> keeps it up to date. Or paste a Path of Building code.</p>
+          <p>Choose the build you save in <b>Path of Building 2</b> – it reloads on every save. Or link your character on poe.ninja, or paste a Path of Building code.</p>
           <div class="row">
             <button class="btn primary" data-goto="source">Set up build source</button>
             <button class="btn" id="empty-paste">Paste build code</button>
@@ -134,7 +134,23 @@
       <!-- BUILD SOURCE -->
       <section class="page" data-page="source" data-title="Build source" data-sub="Where your character comes from">
         <div class="card pad">
-          <div class="card-head"><h2>poe.ninja</h2><span class="badge">recommended</span></div>
+          <div class="card-head"><h2>Path of Building 2 file</h2><span class="badge">always up to date</span></div>
+          <p class="text">
+            In Path of Building 2 click <b>Items and Skills</b> or <b>Passive Tree and Jewels</b> to import your character,
+            then save with <b>Ctrl+S</b>. Choose the build here once – every save in PoB reloads it automatically.
+            The file is only read on this computer; nothing is sent anywhere.
+          </p>
+          <div class="pob-files" id="pob-files"></div>
+          <div class="row pob-actions">
+            <button class="btn sm" id="pob-choose">Choose file…</button>
+            <button class="btn sm ghost" id="pob-reload-list">Refresh list</button>
+            <button class="btn sm ghost" id="pob-folder">Open folder</button>
+            <span class="card-note" id="pob-dir"></span>
+          </div>
+        </div>
+
+        <div class="card pad">
+          <div class="card-head"><h2>poe.ninja</h2></div>
           <p class="text">
             If your profile is public, poe.ninja lists your character together with its Path of Building code.
             Open your character on <b>poe.ninja → Builds</b>, copy the address from the browser and paste it here.

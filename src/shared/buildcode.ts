@@ -1,4 +1,4 @@
-import { inflateSync } from 'node:zlib';
+import { deflateSync, inflateSync } from 'node:zlib';
 
 /** Upper bound for a pasted or downloaded code (real codes are 5–40 KB). */
 export const MAX_CODE_LENGTH = 500_000;
@@ -31,4 +31,9 @@ export function decodeBuildCode(code: string): string {
     throw new Error('This is not a Path of Building code.');
   }
   return xml;
+}
+
+/** XML → Path of Building code (the same format PoB's Export → Generate produces). */
+export function encodeBuildCode(xml: string): string {
+  return deflateSync(Buffer.from(xml, 'utf8'), { level: 9 }).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
 }

@@ -73,7 +73,9 @@ export function iconsFromModel(model: Record<string, unknown>): ItemIcon[] {
       if (!url || !url.startsWith(ICON_HOST) || !typeLine || !inventoryId) continue;
       const name = str(d.name);
       const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
-      icons.push({ name: name ? `${name}, ${typeLine}` : typeLine, inventoryId, x: num(d.x), w: num(d.w), h: num(d.h), url });
+      const base = str(d.baseType);
+      const unique = /^(Unique|Relic)$/i.test(str(d.frameTypeId) ?? '') || d.frameType === 3;
+      icons.push({ name: name ? `${name}, ${typeLine}` : typeLine, ...(base ? { base } : {}), ...(unique ? { unique: true } : {}), inventoryId, x: num(d.x), w: num(d.w), h: num(d.h), url });
     }
   }
   return icons;
@@ -101,6 +103,16 @@ const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
 /** Character path as poe.ninja's profile pages use it: <account>/<league>/<character> */
 const profilePath = (c: NinjaCharacter) => `${encodeURIComponent(c.account)}/${encodeURIComponent(c.league)}/${encodeURIComponent(c.character)}`;
 
+async function fetchProfileModel(c: NinjaCharacter, userAgent: string, fetchImpl: FetchLike): Promise<Record<string, unknown>> {
+  const model = JSON.parse(await get(fetchImpl, `${BASE}/api/profile/characters/${profilePath(c)}/model/60`, userAgent)) as { charModel?: Record<string, unknown> };
+  return model.charModel ?? {};
+}
+
+/** Only the item pictures of a character's poe.ninja profile (for builds loaded from a PoB file or code). */
+export async function fetchNinjaIcons(c: NinjaCharacter, userAgent: string, fetchImpl: FetchLike = fetch): Promise<ItemIcon[]> {
+  return iconsFromModel(await fetchProfileModel(c, userAgent, fetchImpl));
+}
+
 /**
  * Loads a character's Path of Building code from its poe.ninja profile – the same address PoB uses when
  * importing from a poe.ninja profile page. The profile is kept fresher than the build snapshots and also works for characters outside them.
@@ -112,8 +124,7 @@ export async function fetchNinjaBuild(c: NinjaCharacter, userAgent: string, fetc
 
   let meta: Record<string, unknown> = {};
   try {
-    const model = JSON.parse(await get(fetchImpl, `${BASE}/api/profile/characters/${profilePath(c)}/model/60`, userAgent)) as { charModel?: Record<string, unknown> };
-    meta = model.charModel ?? {};
+    meta = await fetchProfileModel(c, userAgent, fetchImpl);
   } catch {
     // Timestamps are optional – the app then shows when the code was loaded.
   }

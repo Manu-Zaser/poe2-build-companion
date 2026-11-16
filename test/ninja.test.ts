@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { characterLink, fetchNinjaBuild, parseCharacterLink } from '../src/shared/ninja';
+import { characterLink, fetchNinjaBuild, fetchNinjaIcons, iconsFromModel, parseCharacterLink } from '../src/shared/ninja';
 
 describe('parseCharacterLink', () => {
   it('reads league, account and character', () => {
@@ -94,5 +94,31 @@ describe('fetchNinjaBuild', () => {
     await expect(fetchNinjaBuild(me, 't', fakeFetch({ status: 404 }, {}).f)).rejects.toThrow(/does not know this character/);
     await expect(fetchNinjaBuild(me, 't', fakeFetch({ body: ' ' }, {}).f)).rejects.toThrow(/no Path of Building code/);
     await expect(fetchNinjaBuild(me, 't', fakeFetch({ throws: true }, {}).f)).rejects.toThrow(/could not be reached/);
+  });
+});
+
+describe('item pictures', () => {
+  it('keeps base and marks uniques', () => {
+    const icons = iconsFromModel({
+      items: [
+        { itemData: { inventoryId: 'Gloves', name: 'Grim Claw', typeLine: 'Barbed Bracers', baseType: 'Barbed Bracers', frameTypeId: 'Rare', icon: 'https://web.poecdn.com/g.png' } },
+        { itemData: { inventoryId: 'Belt', name: 'Headhunter', typeLine: 'Heavy Belt', baseType: 'Heavy Belt', frameTypeId: 'Unique', icon: 'https://web.poecdn.com/hh.png' } },
+      ],
+    });
+    expect(icons.map((i) => [i.name, i.base, i.unique])).toEqual([
+      ['Grim Claw, Barbed Bracers', 'Barbed Bracers', undefined],
+      ['Headhunter, Heavy Belt', 'Heavy Belt', true],
+    ]);
+  });
+
+  it('loads only the profile data for pictures', async () => {
+    const urls: string[] = [];
+    const f = async (url: string) => {
+      urls.push(url);
+      return { ok: true, status: 200, text: async () => JSON.stringify({ charModel: { items: [{ itemData: { inventoryId: 'Helm', name: '', typeLine: 'Cap', icon: 'https://web.poecdn.com/c.png' } }] } }) };
+    };
+    const icons = await fetchNinjaIcons({ league: 'forbiddenrites', account: 'A-1', character: 'B' }, 't', f);
+    expect(icons.map((i) => i.name)).toEqual(['Cap']);
+    expect(urls).toEqual(['https://poe.ninja/poe2/api/profile/characters/A-1/forbiddenrites/B/model/60']);
   });
 });

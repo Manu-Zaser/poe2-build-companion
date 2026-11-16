@@ -1,9 +1,9 @@
-import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, shell } from 'electron';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { decodeBuildCode, MAX_CODE_LENGTH, normalizeBuildCode } from '../shared/buildcode';
+import { basename, join } from 'node:path';
+import { decodeBuildCode, encodeBuildCode, MAX_CODE_LENGTH, normalizeBuildCode } from '../shared/buildcode';
 import { validateHotkey } from '../shared/hotkey';
-import { characterLink, fetchNinjaBuild, parseCharacterLink } from '../shared/ninja';
+import { characterLink, fetchNinjaBuild, fetchNinjaIcons, parseCharacterLink } from '../shared/ninja';
 import type {
   BuildSource,
   BuildView,
@@ -13,6 +13,7 @@ import type {
   NinjaCharacter,
   OverlayContent,
   Overview,
+  PobFileEntry,
   Settings,
   StoredBuild,
   StoredState,
@@ -21,6 +22,7 @@ import { judgeItem } from '../shared/verdict';
 import { Engine } from './engine';
 import { log } from './log';
 import { Overlay } from './overlay';
+import { findBuildsDir, listBuildFiles, readBuildFile, watchBuildFile } from './pobfile';
 import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle, sendCopy } from './win32';
 
 /**
@@ -60,7 +62,16 @@ function sanitizeIcons(v: unknown): ItemIcon[] | undefined {
     .filter((i): i is Record<string, unknown> => !!i && typeof i === 'object')
     .filter((i) => typeof i.name === 'string' && typeof i.inventoryId === 'string' && typeof i.url === 'string' && i.url.startsWith('https://web.poecdn.com/'))
     .slice(0, 100)
-    .map((i) => ({ name: i.name as string, inventoryId: i.inventoryId as string, url: i.url as string, x: num(i.x), w: num(i.w), h: num(i.h) }));
+    .map((i) => ({
+      name: i.name as string,
+      ...(typeof i.base === 'string' ? { base: i.base } : {}),
+      ...(i.unique === true ? { unique: true } : {}),
+      inventoryId: i.inventoryId as string,
+      url: i.url as string,
+      x: num(i.x),
+      w: num(i.w),
+      h: num(i.h),
+    }));
 }
 
 function sanitizeEquips(v: unknown): EquipRecord[] | undefined {
@@ -84,8 +95,10 @@ function sanitizeBuild(v: unknown): StoredBuild | undefined {
   if (src?.kind === 'ninja') {
     const n = sanitizeNinja(src);
     if (n) source = { kind: 'ninja', ...n };
+  } else if (src?.kind === 'file' && typeof src.path === 'string' && /\.xml$/i.test(src.path) && typeof src.name === 'string') {
+    source = { kind: 'file', path: src.path, name: src.name.slice(0, 200) };
   }
-  const icons = source.kind === 'ninja' ? sanitizeIcons(b.icons) : undefined;
+  const icons = sanitizeIcons(b.icons);
   const equips = sanitizeEquips(b.equips);
   return {
     code,
@@ -164,6 +177,7 @@ async function calculate(code: string, equips: EquipRecord[] = []): Promise<Over
 
 async function setBuild(code: string, source: BuildSource, extra: Pick<StoredBuild, 'snapshotAt' | 'icons' | 'leagueName' | 'equips'> = {}) {
   const ov = await calculate(code, extra.equips);
+  if (source.kind !== 'file') stopWatchingFile();
   overview = ov;
   store.build = { code, source, importedAt: new Date().toISOString(), ...extra };
   if (!store.build.equips?.length) delete store.build.equips;
@@ -186,12 +200,88 @@ async function refreshFromNinja(): Promise<Result> {
     const checked = nb.checkedAt ? Date.parse(nb.checkedAt) : NaN;
     const same = store.build?.source.kind === 'ninja' && store.build.source.character === ninja.character && store.build.source.account === ninja.account;
     const equips = same && Number.isFinite(checked) ? (store.build?.equips ?? []).filter((e) => Date.parse(e.at) > checked) : [];
+    if (nb.icons) iconCache = { key: `${ninja.account}/${ninja.league}/${ninja.character}`, at: Date.now(), icons: nb.icons };
     await setBuild(code, { kind: 'ninja', ...ninja }, { snapshotAt: nb.checkedAt, icons: nb.icons, leagueName: nb.leagueName, equips });
     return ok();
   } catch (err) {
     log(`ninja refresh failed: ${message(err)}`);
     return fail(err);
   }
+}
+
+// ---------- Item pictures for builds from a file or code ----------
+
+/** Pictures come from the linked poe.ninja profile; at most one request every 10 minutes. */
+let iconCache: { key: string; at: number; icons: ItemIcon[] } | null = null;
+const ICON_CACHE_MS = 10 * 60_000;
+
+async function profileIcons(): Promise<ItemIcon[] | undefined> {
+  const ninja = store.settings.ninja;
+  if (!ninja) return undefined;
+  const key = `${ninja.account}/${ninja.league}/${ninja.character}`;
+  if (iconCache?.key === key && Date.now() - iconCache.at < ICON_CACHE_MS) return iconCache.icons;
+  try {
+    const icons = await fetchNinjaIcons(ninja, userAgent());
+    iconCache = { key, at: Date.now(), icons };
+    return icons;
+  } catch (err) {
+    log(`item pictures from poe.ninja not available: ${message(err)}`);
+    // Keep showing the pictures we had rather than none.
+    return iconCache?.key === key ? iconCache.icons : store.build?.icons;
+  }
+}
+
+// ---------- Path of Building build file ----------
+
+/** PoB 2's build folder (tests point it elsewhere). */
+const buildsDir = () => process.env.COMPANION_POB_BUILDS ?? findBuildsDir(app.getPath('documents'));
+
+let stopFileWatch: (() => void) | null = null;
+
+/** Loads a build file saved by PoB 2 and keeps watching it. */
+async function loadFromFile(path: string): Promise<Result> {
+  try {
+    const { xml, mtime } = readBuildFile(path);
+    const code = normalizeBuildCode(encodeBuildCode(xml));
+    if (!code) throw new Error('This build file is too large.');
+    const name = basename(path).replace(/\.xml$/i, '');
+    // Items equipped here after PoB last saved the file are not in it – keep them on top.
+    const same = store.build?.source.kind === 'file' && store.build.source.path === path;
+    const equips = same ? (store.build?.equips ?? []).filter((e) => Date.parse(e.at) > mtime) : [];
+    await setBuild(code, { kind: 'file', path, name }, { snapshotAt: new Date(mtime).toISOString(), equips, icons: await profileIcons() });
+    startFileWatch(path);
+    return ok();
+  } catch (err) {
+    log(`build file ${path} could not be loaded: ${message(err)}`);
+    return fail(err);
+  }
+}
+
+function startFileWatch(path: string) {
+  stopFileWatch?.();
+  stopFileWatch = watchBuildFile(path, () => void reloadFile(path));
+}
+
+function stopWatchingFile() {
+  stopFileWatch?.();
+  stopFileWatch = null;
+}
+
+/** PoB saved the file: reload. PoB writes in place, so retry once if it was caught mid-save. */
+async function reloadFile(path: string, retry = true) {
+  if (store.build?.source.kind !== 'file' || store.build.source.path !== path) return;
+  const res = await loadFromFile(path);
+  if (res.ok) {
+    notify(`Reloaded – ${basename(path).replace(/\.xml$/i, '')} was saved in Path of Building.`);
+  } else if (retry) {
+    setTimeout(() => void reloadFile(path, false), 1000);
+  } else {
+    notify(res.error, 'error');
+  }
+}
+
+function notify(text: string, kind: 'ok' | 'error' = 'ok') {
+  mainWin?.webContents.send('notice', { text, kind });
 }
 
 // ---------- Item check ----------
@@ -334,7 +424,7 @@ function registerIpc() {
     const code = normalizeBuildCode(text);
     if (!code) return fail('The clipboard does not contain a Path of Building code.');
     try {
-      await setBuild(code, { kind: 'paste' }); // a new code is the newest state: local items are dropped
+      await setBuild(code, { kind: 'paste' }, { icons: await profileIcons() }); // a new code is the newest state: local items are dropped
       return ok();
     } catch (err) {
       return fail(err);
@@ -381,6 +471,31 @@ function registerIpc() {
   ipcMain.handle('ninja:open', () => {
     if (store.settings.ninja) void shell.openExternal(characterLink(store.settings.ninja));
   });
+
+  ipcMain.handle('pobfile:list', (): { dir: string; files: PobFileEntry[] } => {
+    const dir = buildsDir();
+    const files = listBuildFiles(dir).map((f) => ({
+      path: f.path,
+      name: f.name,
+      savedAt: new Date(f.mtime).toISOString(),
+      ...(f.level ? { level: f.level } : {}),
+      ...(f.className ? { className: f.className } : {}),
+    }));
+    return { dir, files };
+  });
+  ipcMain.handle('pobfile:use', (_e, path: unknown) => (typeof path === 'string' ? loadFromFile(path) : fail('Invalid file.')));
+  ipcMain.handle('pobfile:choose', async (): Promise<Result | null> => {
+    if (!mainWin) return null;
+    const res = await dialog.showOpenDialog(mainWin, {
+      title: 'Choose a Path of Building 2 build',
+      defaultPath: buildsDir(),
+      filters: [{ name: 'Path of Building build', extensions: ['xml'] }],
+      properties: ['openFile'],
+    });
+    if (res.canceled || !res.filePaths[0]) return null;
+    return loadFromFile(res.filePaths[0]);
+  });
+  ipcMain.handle('pobfile:open-folder', () => void shell.openPath(buildsDir()));
 
   ipcMain.handle('settings:hotkey', (_e, acc: unknown): Result => {
     if (typeof acc !== 'string') return fail('Invalid hotkey.');
@@ -457,14 +572,30 @@ async function startEngine() {
     await engine.start();
     engineState = 'ready';
     pushView();
-    if (store.build) {
+    const b = store.build;
+    if (b?.source.kind === 'file') {
+      // Saved in PoB while the app was closed? Then load the file, otherwise the stored state.
+      let newer = false;
+      try {
+        newer = readBuildFile(b.source.path).mtime > Date.parse(b.snapshotAt ?? '');
+      } catch {
+        // file missing or mid-save – use the stored state
+      }
+      if (newer) {
+        const res = await loadFromFile(b.source.path);
+        if (!res.ok) engineError = res.error;
+      } else {
+        startFileWatch(b.source.path);
+      }
+    }
+    if (store.build && !overview) {
       try {
         overview = await calculate(store.build.code, store.build.equips);
       } catch (err) {
         engineError = `Your saved build could not be calculated: ${message(err)}`;
       }
-      pushView();
     }
+    pushView();
   } catch (err) {
     engineState = 'failed';
     engineError = message(err);
@@ -497,6 +628,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('window-all-closed', () => app.quit());
   app.on('will-quit', () => {
     globalShortcut.unregisterAll();
+    stopWatchingFile();
     overlay.destroy();
     engine.stop();
   });
