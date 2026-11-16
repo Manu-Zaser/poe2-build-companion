@@ -1,5 +1,6 @@
 import type { Api } from '../main/preload';
 import type { OverlayContent } from '../shared/types';
+import { fitCount, type Fit } from '../shared/targets';
 import { VERDICT_TEXT, type SlotVerdict } from '../shared/verdict';
 import { compact, fmt } from './format';
 
@@ -63,6 +64,31 @@ function equipButton(v: SlotVerdict, content: Extract<OverlayContent, { kind: 'c
   return b;
 }
 
+/** "Fits your build: 3 of 4 target stats" with the checklist (full only for the best slot). */
+function fitBlock(fit: Fit, full: boolean): HTMLElement {
+  const { have, total } = fitCount(fit);
+  const box = el('div', 'fit');
+  let head: string;
+  if (fit.unique) head = have ? `Fits your build: this is the ${fit.targetName} from your target` : `Your target has ${fit.targetName} here`;
+  else head = total ? `Fits your build: ${have} of ${total} target stats` : 'Fits your build: no key stats to compare';
+  const cls = fit.unique ? (have ? 'good' : 'off') : total && have / total >= 0.67 ? 'good' : have / Math.max(1, total) >= 0.34 ? 'some' : 'off';
+  box.classList.add(cls);
+  box.append(el('div', 'fit-head', head));
+  if (!full || fit.unique) {
+    const missing = fit.missing.filter((w) => !w.minor);
+    if (!fit.unique && missing.length) box.append(el('div', 'fit-missing', `missing: ${missing.map((w) => w.label).join(', ')}`));
+    return box;
+  }
+  const list = el('ul', 'fit-list');
+  for (const w of fit.have) {
+    const vals = w.itemValue !== undefined && w.value !== undefined ? ` (${fmt(w.itemValue)} · target ${fmt(w.value)})` : '';
+    list.append(el('li', `has${w.minor ? ' minor' : ''}`, `✓ ${w.label}`, el('small', '', vals)));
+  }
+  for (const w of fit.missing) list.append(el('li', `miss${w.minor ? ' minor' : ''}`, `✗ ${w.label}`));
+  box.append(list);
+  return box;
+}
+
 function slotBlock(v: SlotVerdict, content: Extract<OverlayContent, { kind: 'check' }>, first: boolean): HTMLElement {
   const block = el('div', 'slot-block');
   block.append(
@@ -70,6 +96,8 @@ function slotBlock(v: SlotVerdict, content: Extract<OverlayContent, { kind: 'che
   );
   block.append(el('div', `verdict ${v.kind}`, el('div', 'v', VERDICT_TEXT[v.kind]), el('div', 'sub', summary(v))));
   if (v.warnings.length) block.append(el('ul', 'warns', ...v.warnings.map((w) => el('li', '', w))));
+  const fit = content.fits?.[v.slot];
+  if (fit) block.append(fitBlock(fit, first));
   if (!first) return block;
 
   block.append(

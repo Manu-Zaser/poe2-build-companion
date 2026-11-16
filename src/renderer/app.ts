@@ -1,5 +1,6 @@
 import type { Api } from '../main/preload';
 import type { BuildView, GearSlot, ItemIcon, ItemInfo, Overview, PobFileEntry, SkillDps, Stats } from '../shared/types';
+import { fitAgainst } from '../shared/targets';
 import { acceleratorFromEvent, formatHotkey, validateHotkey } from '../shared/hotkey';
 import { ageText, compact, fmt, isStale, short } from './format';
 
@@ -506,6 +507,88 @@ function render(v: BuildView) {
     $('ninja-meta').textContent = `League ${ninja.league}` + (b ? ` · loaded ${ageText(b.importedAt)}` : ' · not loaded yet');
   }
   renderPobFiles();
+  renderTarget(v);
+}
+
+// ---------- Target build ----------
+
+const fitClass = (have: number, total: number) => (total === 0 ? 'off' : have / total >= 0.67 ? 'good' : have / total >= 0.34 ? 'some' : 'off');
+
+function renderTarget(v: BuildView) {
+  const t = v.target;
+  $('target-current').hidden = !t;
+  $('target-intro').hidden = !!t;
+  $('target-paste').textContent = t ? 'Replace with code from clipboard' : 'Paste target code';
+  $('target-progress-card').hidden = !t || !v.overview;
+  if (t) {
+    $('target-name').textContent = t.name;
+    const who = [t.build.ascendancy ?? t.build.className, t.build.level ? `level ${t.build.level}` : ''].filter(Boolean).join(' ');
+    $('target-meta').textContent = [who, t.source === 'file' ? 'from a PoB 2 file' : 'from a pasted code', `set ${ageText(t.importedAt)}`].filter(Boolean).join(' · ');
+  }
+  $('target-note').textContent = t ? `${t.build.slots.length} slots with target items` : '';
+  renderTargetFiles();
+  if (!t || !v.overview) return;
+
+  const ov = v.overview;
+  const gear = new Map(ov.gear.map((g) => [g.slot, g.item]));
+  let sumHave = 0;
+  let sumTotal = 0;
+  const rows = t.build.slots.map((ts) => {
+    const mine = ts.slot.startsWith('Weapon') && ov.weaponSet === 2 ? gear.get(`${ts.slot} Swap`) : gear.get(ts.slot);
+    const targetRarity = `rarity-${ts.rarity.toLowerCase()}`;
+    const names = el(
+      'div',
+      'names',
+      'Target ',
+      el('b', targetRarity, ts.name),
+      ts.unique ? '' : ` (${ts.base})`,
+      ' · yours ',
+      mine ? el('b', `rarity-${mine.rarity.toLowerCase()}`, mine.title ?? mine.base) : el('b', '', 'empty'),
+    );
+    const fit = mine ? fitAgainst(ts, mine) : null;
+    const chips = el('div', 'chips');
+    const counted = ts.wanted.filter((w) => !w.minor).length;
+    let have = 0;
+    for (const w of ts.wanted) {
+      const hit = fit?.have.find((h) => h.key === w.key);
+      if (hit && !w.minor) have++;
+      const vals = hit?.itemValue !== undefined && w.value !== undefined ? `${fmt(hit.itemValue)} / ${fmt(w.value)}` : w.value !== undefined && !hit ? fmt(w.value) : '';
+      const chip = el('span', `chip ${hit ? 'has' : 'miss'}${w.minor ? ' minor' : ''}`, `${hit ? '✓' : '✗'} ${w.label}`, vals && el('small', '', vals));
+      chip.title = hit ? `Your item has it${vals ? ` (yours / target: ${vals})` : ''}` : `Missing${w.value !== undefined ? ` – target item: ${fmt(w.value)}` : ''}`;
+      chips.append(chip);
+    }
+    sumHave += have;
+    sumTotal += counted;
+    const score = el('div', `score ${fitClass(have, counted)}`, counted ? `${have}/${counted}` : '–');
+    return el('div', 'target-row', el('div', 'slot', ts.slot), el('div', '', names, chips), score);
+  });
+  const bar = el('div', 'progress-bar', el('i'));
+  (bar.firstChild as HTMLElement).style.width = `${sumTotal ? Math.round((sumHave / sumTotal) * 100) : 0}%`;
+  $('target-rows').replaceChildren(bar, ...rows);
+  $('target-progress-note').textContent = `${sumHave} of ${sumTotal} target stats (${sumTotal ? Math.round((sumHave / sumTotal) * 100) : 0}%)`;
+}
+
+function renderTargetFiles() {
+  const box = $('target-files');
+  if (!pobFiles || pobFiles.files.length === 0) {
+    box.replaceChildren();
+    return;
+  }
+  box.replaceChildren(
+    el('p', 'card-note', 'Or use a build saved in Path of Building 2:'),
+    ...pobFiles.files.slice(0, 6).map((f) => {
+      const isTarget = current?.target?.source === 'file' && current.target.name === f.name;
+      const info = [f.level ? `Level ${f.level}` : '', f.className ?? '', `saved ${ageText(f.savedAt)}`].filter(Boolean).join(' · ');
+      const action = isTarget
+        ? el('span', 'watching', '● Target')
+        : (() => {
+            const b = el('button', 'btn sm', 'Use as target');
+            b.addEventListener('click', () => void run(b, () => api.useTargetFile(f.path), `${f.name} is now your target build.`));
+            return b;
+          })();
+      return el('div', `pob-file${isTarget ? ' current' : ''}`, el('div', '', el('b', '', f.name), el('small', '', info)), action);
+    }),
+  );
 }
 
 // ---------- Path of Building 2 files ----------
@@ -515,6 +598,7 @@ let pobFiles: { dir: string; files: PobFileEntry[] } | null = null;
 async function loadPobFiles() {
   pobFiles = await api.listPobFiles();
   renderPobFiles();
+  renderTargetFiles();
 }
 
 function renderPobFiles() {
@@ -566,6 +650,11 @@ $<HTMLButtonElement>('pob-choose').addEventListener('click', (e) => {
 });
 // The list is read when the page is opened (files change while the app runs).
 document.querySelector('.nav-item[data-page=source]')?.addEventListener('click', () => void loadPobFiles());
+document.querySelector('.nav-item[data-page=target]')?.addEventListener('click', () => void loadPobFiles());
+$<HTMLButtonElement>('target-paste').addEventListener('click', (e) =>
+  void run(e.currentTarget as HTMLButtonElement, () => api.pasteTarget(), 'Target build set – the item check now also shows whether an item fits it.'),
+);
+$<HTMLButtonElement>('target-clear').addEventListener('click', (e) => void run(e.currentTarget as HTMLButtonElement, () => api.clearTarget(), 'Target build removed.'));
 api.onNotice((n) => message(n.text, n.kind));
 
 $('hk-record').addEventListener('click', () => (recording ? stopRecording() : startRecording()));

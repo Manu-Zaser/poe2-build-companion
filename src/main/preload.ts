@@ -27,6 +27,10 @@ const api = {
   onNotice: (cb: (n: { text: string; kind: 'ok' | 'error' }) => void) => {
     ipcRenderer.on('notice', (_e, n: { text: string; kind: 'ok' | 'error' }) => cb(n));
   },
+  /** Target build (the build you follow, e.g. from a guide). */
+  pasteTarget: (): Promise<Result> => ipcRenderer.invoke('target:paste'),
+  useTargetFile: (path: string): Promise<Result> => ipcRenderer.invoke('target:use-file', path),
+  clearTarget: (): Promise<Result> => ipcRenderer.invoke('target:clear'),
   setHotkey: (acc: string): Promise<Result> => ipcRenderer.invoke('settings:hotkey', acc),
   resetOverlayPosition: (): Promise<Result> => ipcRenderer.invoke('settings:reset-overlay'),
 

@@ -17,7 +17,10 @@ import type {
   Settings,
   StoredBuild,
   StoredState,
+  StoredTarget,
+  TargetView,
 } from '../shared/types';
+import { fitForSlot, parseTargetBuild, type Fit, type TargetBuild } from '../shared/targets';
 import { judgeItem } from '../shared/verdict';
 import { Engine } from './engine';
 import { log } from './log';
@@ -120,10 +123,18 @@ function sanitizeSettings(v: unknown): Settings {
   return { ninja: sanitizeNinja(s.ninja), hotkey, ...(overlayPosition ? { overlayPosition } : {}) };
 }
 
+function sanitizeTarget(v: unknown): StoredTarget | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const t = v as Record<string, unknown>;
+  const code = typeof t.code === 'string' ? normalizeBuildCode(t.code) : null;
+  if (!code || typeof t.name !== 'string' || typeof t.importedAt !== 'string') return undefined;
+  return { code, name: t.name.slice(0, 200), source: t.source === 'file' ? 'file' : 'paste', importedAt: t.importedAt };
+}
+
 function loadStore(): StoredState {
   try {
     const raw = JSON.parse(readFileSync(storeFile(), 'utf8')) as Partial<StoredState>;
-    return { build: sanitizeBuild(raw.build), settings: sanitizeSettings(raw.settings) };
+    return { build: sanitizeBuild(raw.build), target: sanitizeTarget(raw.target), settings: sanitizeSettings(raw.settings) };
   } catch {
     return { settings: sanitizeSettings(undefined) };
   }
@@ -153,8 +164,47 @@ let overview: Overview | undefined;
 let loadMs: number | undefined;
 let hotkeyActive = false;
 
+// ---------- Target build ----------
+
+/** Parsed target build (cached; parsing is fast but happens on every view). */
+let targetCache: { code: string; build: TargetBuild } | null = null;
+
+function targetBuild(): TargetBuild | null {
+  const t = store.target;
+  if (!t) return null;
+  if (targetCache?.code !== t.code) {
+    try {
+      targetCache = { code: t.code, build: parseTargetBuild(decodeBuildCode(t.code)) };
+    } catch (err) {
+      log(`target build could not be read: ${message(err)}`);
+      return null;
+    }
+  }
+  return targetCache.build;
+}
+
+function targetView(): TargetView | undefined {
+  const t = store.target;
+  const build = targetBuild();
+  return t && build ? { name: t.name, source: t.source, importedAt: t.importedAt, build } : undefined;
+}
+
+/** Sets the target build from an XML text. Throws with a user-facing message. */
+function setTarget(xml: string, name: string, source: 'paste' | 'file') {
+  const build = parseTargetBuild(xml);
+  if (build.slots.length === 0) throw new Error('This build has no equipment to compare with. Use a build that has items, e.g. from a guide.');
+  const code = normalizeBuildCode(encodeBuildCode(xml));
+  if (!code) throw new Error('This build is too large.');
+  store.target = { code, name, source, importedAt: new Date().toISOString() };
+  targetCache = { code, build };
+  saveStore();
+  pushView();
+}
+
+const targetName = (b: TargetBuild) => [b.ascendancy ?? b.className, b.level ? `level ${b.level}` : ''].filter(Boolean).join(' ') || 'Target build';
+
 function view(): BuildView {
-  return { build: store.build, settings: store.settings, overview, engine: engineState, engineError, loadMs, hotkeyActive };
+  return { build: store.build, settings: store.settings, overview, engine: engineState, engineError, loadMs, hotkeyActive, target: targetView() };
 }
 
 let mainWin: BrowserWindow | null = null;
@@ -371,7 +421,24 @@ async function itemCheck(textOverride?: string) {
       return;
     }
     lastItemText = text;
-    showOverlay({ kind: 'check', item: result.item, verdicts: judgeItem(result.before, result.slots), mainSkill: overview.mainSkill, ms });
+    const verdicts = judgeItem(result.before, result.slots);
+    // "Does it fit my build?" – checked against the target build, if one is set.
+    const target = targetBuild();
+    const fits: Record<string, Fit> = {};
+    if (target) {
+      for (const v of verdicts) {
+        const fit = fitForSlot(target, v.slot, result.item);
+        if (fit) fits[v.slot] = fit;
+      }
+    }
+    showOverlay({
+      kind: 'check',
+      item: result.item,
+      verdicts,
+      mainSkill: overview.mainSkill,
+      ms,
+      ...(target ? { fits, targetName: store.target?.name } : {}),
+    });
     log(`item check: ${result.item.name} in ${ms} ms`);
   } catch (err) {
     log(`item check failed: ${message(err)}`);
@@ -470,6 +537,35 @@ function registerIpc() {
 
   ipcMain.handle('ninja:open', () => {
     if (store.settings.ninja) void shell.openExternal(characterLink(store.settings.ninja));
+  });
+
+  // Target build: from a pasted code (clipboard read once, on click) or a PoB 2 file.
+  ipcMain.handle('target:paste', async (): Promise<Result> => {
+    const code = normalizeBuildCode((await clipboard.readText()).slice(0, MAX_CODE_LENGTH + 1000));
+    if (!code) return fail('The clipboard does not contain a Path of Building code.');
+    try {
+      const xml = decodeBuildCode(code);
+      setTarget(xml, targetName(parseTargetBuild(xml)), 'paste');
+      return ok();
+    } catch (err) {
+      return fail(err);
+    }
+  });
+  ipcMain.handle('target:use-file', (_e, path: unknown): Result => {
+    if (typeof path !== 'string') return fail('Invalid file.');
+    try {
+      setTarget(readBuildFile(path).xml, basename(path).replace(/\.xml$/i, ''), 'file');
+      return ok();
+    } catch (err) {
+      return fail(err);
+    }
+  });
+  ipcMain.handle('target:clear', (): Result => {
+    delete store.target;
+    targetCache = null;
+    saveStore();
+    pushView();
+    return ok();
   });
 
   ipcMain.handle('pobfile:list', (): { dir: string; files: PobFileEntry[] } => {

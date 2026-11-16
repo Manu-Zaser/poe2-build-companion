@@ -169,7 +169,26 @@ export interface Settings {
 
 export interface StoredState {
   build?: StoredBuild;
+  /** The build the player follows (e.g. from a guide). */
+  target?: StoredTarget;
   settings: Settings;
+}
+
+export interface StoredTarget {
+  code: string;
+  /** Shown name: the PoB file name, or class and level for a pasted code. */
+  name: string;
+  source: 'paste' | 'file';
+  /** ISO time it was set. */
+  importedAt: string;
+}
+
+/** Target build as the renderer and overlay get it. */
+export interface TargetView {
+  name: string;
+  source: 'paste' | 'file';
+  importedAt: string;
+  build: import('./targets').TargetBuild;
 }
 
 /** What the renderer gets: stored state plus the calculated overview. */
@@ -182,6 +201,7 @@ export interface BuildView {
   loadMs?: number;
   /** false if another program already uses the hotkey. */
   hotkeyActive: boolean;
+  target?: TargetView;
 }
 
 /** A build file saved by Path of Building 2, as listed on the Build source page. */
@@ -196,5 +216,15 @@ export interface PobFileEntry {
 
 /** What the overlay shows. */
 export type OverlayContent =
-  | { kind: 'check'; item: ItemInfo; verdicts: import('./verdict').SlotVerdict[]; mainSkill?: string; ms: number; equipped?: string }
+  | {
+      kind: 'check';
+      item: ItemInfo;
+      verdicts: import('./verdict').SlotVerdict[];
+      mainSkill?: string;
+      ms: number;
+      equipped?: string;
+      /** Fit with the target build per slot (only with a target build). */
+      fits?: Record<string, import('./targets').Fit>;
+      targetName?: string;
+    }
   | { kind: 'error'; message: string };

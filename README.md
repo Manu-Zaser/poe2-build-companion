@@ -3,13 +3,26 @@
 Desktop tool for Path of Exile 2 that knows your character and the build you follow, and answers one question
 for an item you just found: *is it better than what I wear, and does it fit my build?*
 
-Status: **Phase 2 (item check) – done.** Next: phase 3, target build from a guide ("does it fit my build?").
+Status: **Phase 3 (target build) – done.** Phases 0–3 of the concept are complete; next: a distributable exe.
 
 > This product isn't affiliated with or endorsed by Grinding Gear Games in any way.
 > Uses [Path of Building PoE2](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2) (MIT, © David Gowor)
 > as its calculation engine, unchanged, as a git submodule.
 
-## Item check (phase 2)
+## Target build (phase 3)
+
+On the *Target build* page, set the build you follow – paste its Path of Building code (e.g. from a guide) or use a
+build saved in Path of Building 2. Each slot's item becomes a short list of target stats (boots: movement speed, life,
+resistances …; a unique: that unique).
+
+- **Item check:** the overlay adds "Fits your build: 3 of 4 target stats" with a checklist (✓ has, ✗ missing, your
+  roll next to the guide's). Rings are compared with both target rings; for a unique target it says whether this is
+  that unique.
+- **Progress:** the page shows your gear against the target per slot and in total ("5 of 24 target stats").
+- An item counts as soon as it has the stat – the guide's values are shown for orientation, not as a minimum.
+  "+x% to all Elemental Resistances" covers a single elemental resistance. Filler stats (item rarity, light radius,
+  stun threshold, on-kill effects …) are shown in grey and do not count.
+
 
 Hover over an item in game and press the hotkey (default **Alt+D**, changeable on the *Item check* page). The
 overlay answers within a fraction of a second:
@@ -77,6 +90,7 @@ build code, print stats, compare items). Invisible UI test (hidden window, own p
 npm run build
 npx electron scripts/run-hidden.cjs scripts/ui-check.cjs <output folder>     # character page
 npx electron scripts/run-hidden.cjs scripts/check-ui.cjs <output folder>     # item check and overlay
+npx electron scripts/run-hidden.cjs scripts/target-ui.cjs <output folder>    # target build and fit checklist
 npx electron scripts/run-hidden.cjs scripts/file-ui.cjs <output folder>      # PoB file source (own test folder)
 ```
 
@@ -92,7 +106,8 @@ src/engine/bridge.lua        Lua side: boots PoB headless; commands "load", "ove
 src/main/                    Electron main process: window, storage, engine client, poe.ninja refresh, PoB build
                              files (pobfile.ts: find, list, read, watch), hotkey,
                              overlay window, one copy keystroke (win32.ts, from Price Check)
-src/shared/                  Build code decoding, poe.ninja lookup, verdict and warnings, hotkey helpers, types
+src/shared/                  Build code decoding, poe.ninja lookup, verdict and warnings, target build and fit
+                             (targets.ts), hotkey helpers, types
 src/renderer/                Character, build source and item check pages; overlay
 ```
 

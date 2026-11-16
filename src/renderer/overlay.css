@@ -71,3 +71,16 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .foot a:hover { color: var(--text); }
 
 .card-error .msg { margin-top: 8px; font-size: 13px; color: var(--muted); }
+
+/* "Fits your build" (target build) */
+.fit { margin-top: 8px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,244,225,.03); font-size: 12.5px; }
+.fit-head { font-weight: 600; }
+.fit.good .fit-head { color: #a9d48f; }
+.fit.some .fit-head { color: var(--gold-bright); }
+.fit.off .fit-head { color: var(--muted); }
+.fit-missing { margin-top: 2px; color: var(--faint); font-size: 12px; }
+.fit-list { list-style: none; margin: 5px 0 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.fit-list li.has { color: #cfe8c0; }
+.fit-list li.miss { color: #f0b3a7; }
+.fit-list li.minor { opacity: .55; }
+.fit-list small { color: var(--faint); margin-left: 4px; }
