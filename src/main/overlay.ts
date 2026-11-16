@@ -1,8 +1,8 @@
 import { BrowserWindow, screen } from 'electron';
 import { join } from 'node:path';
 import type { OverlayContent } from '../shared/types';
+import { focusWindowByTitle, foregroundWindowTitle } from '@poe2/core/win32';
 import { log } from './log';
-import { focusWindowByTitle, foregroundWindowTitle } from './win32';
 
 /**
  * Item check overlay, built like the Price Check overlay: a frameless window above the game that

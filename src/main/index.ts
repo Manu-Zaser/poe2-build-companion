@@ -2,7 +2,9 @@ import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, shell }
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { decodeBuildCode, encodeBuildCode, MAX_CODE_LENGTH, normalizeBuildCode } from '../shared/buildcode';
-import { validateHotkey } from '../shared/hotkey';
+import { readItemText as readGameItemText } from '@poe2/core/clipboard';
+import { validateHotkey } from '@poe2/core/hotkey';
+import { foregroundWindowHandle } from '@poe2/core/win32';
 import { characterLink, fetchNinjaBuild, fetchNinjaIcons, parseCharacterLink } from '../shared/ninja';
 import type {
   BuildSource,
@@ -26,7 +28,6 @@ import { Engine } from './engine';
 import { log } from './log';
 import { Overlay } from './overlay';
 import { findBuildsDir, listBuildFiles, readBuildFile, watchBuildFile } from './pobfile';
-import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle, sendCopy } from './win32';
 
 /**
  * PoE2 Build Companion – main process.
@@ -43,7 +44,6 @@ const MAX_ITEM_TEXT = 20_000;
 const MAX_EQUIPS = 30;
 
 const userAgent = () => `poe2-build-companion/${app.getVersion()}`;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 // ---------- Storage ----------
@@ -365,29 +365,10 @@ function ownWindowInFront(): boolean {
 /**
  * Game in front: send ONE copy keystroke, wait for the item text, restore the previous clipboard.
  * Game not in front (e.g. testing with an item copied by hand): read the current clipboard once.
+ * The logic lives in @poe2/core (shared with PoE2 Price Check).
  */
-async function readItemText(): Promise<string> {
-  let inGame = foregroundWindowTitle() === GAME_TITLE;
-  // After a click into our overlay the game is not in front – bring it back first (a window switch,
-  // no input to the game), otherwise only the old clipboard would be read.
-  if (!inGame && (foregroundWindowHandle() === 0n || ownWindowInFront()) && focusWindowByTitle(GAME_TITLE)) {
-    for (let waited = 0; waited < 300 && !inGame; waited += 20) {
-      await sleep(20);
-      inGame = foregroundWindowTitle() === GAME_TITLE;
-    }
-  }
-  if (!inGame) return clipboard.readText();
-
-  const previous = await clipboard.readText();
-  await clipboard.writeText('');
-  sendCopy();
-  let text = '';
-  for (let waited = 0; waited < 500 && !text; waited += 10) {
-    await sleep(10);
-    text = await clipboard.readText();
-  }
-  void clipboard.writeText(previous); // restoring must not delay the check
-  return text;
+function readItemText(): Promise<string> {
+  return readGameItemText({ gameTitle: GAME_TITLE, isOwnWindowInFront: ownWindowInFront, log });
 }
 
 async function itemCheck(textOverride?: string) {

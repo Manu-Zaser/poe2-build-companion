@@ -1,7 +1,7 @@
 import type { Api } from '../main/preload';
 import type { BuildView, GearSlot, ItemIcon, ItemInfo, Overview, PobFileEntry, SkillDps, Stats } from '../shared/types';
 import { fitAgainst } from '../shared/targets';
-import { acceleratorFromEvent, formatHotkey, validateHotkey } from '../shared/hotkey';
+import { acceleratorFromEvent, formatHotkey, validateHotkey } from '@poe2/core/hotkey';
 import { ageText, compact, fmt, isStale, short } from './format';
 
 declare global {
