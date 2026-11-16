@@ -229,6 +229,17 @@ describe('upgrade search flow', () => {
     expect(q.query.filters?.trade_filters).toEqual({ filters: { price: { max: 1000 } } });
   });
 
+  it('leaves out listings above the budget even if the trade site let them through', async () => {
+    const { deps } = fakes([25]);
+    const fetch = deps.trade.fetchListings;
+    // Listing 0 costs 3 div – over the 2 div budget.
+    deps.trade.fetchListings = async (id, ids) => (await fetch(id, ids)).map((l, i) => (i === 0 ? { ...l, listing: { ...l.listing, price: { type: '~b/o', amount: 3, currency: 'divine' } } } : l));
+    const r = await searchSlot('Boots', boots, req, deps, { index: 0, count: 1 });
+    expect(r.overBudget).toBe(1);
+    expect(r.evaluated).toBe(2);
+    expect(r.candidates.every((c) => (c.priceDivine ?? 0) <= 2)).toBe(true);
+  });
+
   it('loosens the search when the strict one finds too little', async () => {
     const { deps, searches } = fakes([2, ENOUGH_RESULTS + 5]);
     const r = await searchSlot('Boots', boots, req, deps, { index: 0, count: 1 });

@@ -245,42 +245,59 @@
       </section>
       <!-- UPGRADES -->
       <section class="page" data-page="upgrades" data-title="Upgrades" data-sub="Items on the trade site that beat your gear, within a budget per item">
-        <div class="card pad">
-          <div class="card-head"><h2>Search</h2><span class="card-note" id="up-note"></span></div>
-          <div class="up-form">
-            <label class="up-field">
+        <div class="card up-search">
+          <div class="up-controls">
+            <div class="up-field">
               <span class="up-label">Budget per item</span>
               <span class="up-budget">
-                <input type="number" id="up-budget" min="0" step="any" value="2" />
+                <input type="number" id="up-budget" min="0" step="any" value="2" aria-label="Budget per item" />
                 <span class="set-toggle" id="up-currency" role="group" aria-label="Currency">
                   <button data-cur="divine" class="active">Divine</button><button data-cur="exalted">Exalted</button>
                 </span>
               </span>
-            </label>
-            <label class="up-field">
-              <span class="up-label">Weighting <b id="up-weight-text"></b></span>
-              <input type="range" id="up-weight" min="0" max="100" step="10" value="50" />
-              <span class="up-scale"><span>Defence</span><span>Damage</span></span>
-            </label>
-            <label class="up-check"><input type="checkbox" id="up-instant" checked /> Instant buyout only</label>
+            </div>
+            <div class="up-field up-weight-field">
+              <span class="up-label">Weighting</span>
+              <input type="range" id="up-weight" min="0" max="100" step="10" value="50" aria-label="Weighting between defence and damage" />
+              <span class="up-scale"><span id="up-def-text">Defence</span><span id="up-dmg-text">Damage</span></span>
+            </div>
+            <div class="up-field">
+              <span class="up-label">Listings</span>
+              <label class="up-switch"><input type="checkbox" id="up-instant" checked /><i></i><span>Instant buyout only</span></label>
+            </div>
           </div>
-          <div class="up-label">Slots</div>
+
+          <div class="up-slots-head">
+            <span class="up-label">Slots</span>
+            <span class="up-slots-actions">
+              <button class="link-btn" id="up-all">All</button>
+              <button class="link-btn" id="up-none-btn">None</button>
+            </span>
+          </div>
           <div class="up-slots" id="up-slots"></div>
-          <div class="row up-actions">
-            <button class="btn primary" id="up-start">
+
+          <div class="up-bar">
+            <button class="btn primary up-go" id="up-start">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
               <span>Find upgrades</span>
             </button>
             <button class="btn ghost" id="up-cancel" hidden>Cancel</button>
-            <span class="up-progress" id="up-progress"></span>
+            <div class="up-status">
+              <div class="up-progress" id="up-progress"></div>
+              <div class="up-meter" id="up-meter" hidden><i id="up-meter-fill"></i></div>
+              <div class="up-note" id="up-note"></div>
+            </div>
           </div>
-          <p class="section-hint">
-            Path of Building picks the mods worth most to your build, the trade site is searched anonymously (no login)
-            and every listing found is calculated in your build. Only on click; buying stays with you – open the search
-            on the trade site and contact the seller there.
-          </p>
         </div>
+
+        <div class="up-summary" id="up-summary" hidden></div>
         <div id="up-results" class="up-results"></div>
+
+        <p class="section-hint up-hint">
+          Path of Building picks the mods worth most to your build, the trade site is searched anonymously (no login) and
+          every listing found is calculated in your build – only when you click. Click a listing to open it on the trade
+          site; buying stays with you.
+        </p>
       </section>
     </main>
   </div>

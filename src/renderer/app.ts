@@ -724,61 +724,108 @@ function defaultSlots(ov: Overview): string[] {
   });
 }
 
+function chosenSlots(): string[] {
+  const ov = current?.overview;
+  return ov ? (upForm.slots ?? defaultSlots(ov)) : [];
+}
+
+/** Small item picture (or an empty frame); falls back to nothing if the image fails. */
+function thumb(item: ItemInfo | null, url: string | undefined): HTMLElement {
+  const box = el('span', `up-thumb${item ? ` ${rarityCls(item)}` : ''}`);
+  if (url) {
+    const img = el('img');
+    img.src = url;
+    img.alt = '';
+    img.addEventListener('error', () => img.remove());
+    box.append(img);
+  } else if (!item) {
+    box.append(el('i', 'ph'));
+  }
+  return box;
+}
+
+const gearItem = (slot: string) => current?.overview?.gear.find((g) => g.slot === slot)?.item ?? null;
+const gearThumb = (slot: string) => {
+  const item = gearItem(slot);
+  return thumb(item, item ? iconFor(item, slot, current?.build?.icons ?? []) : undefined);
+};
+
 function renderUpgradeSlots(v: BuildView) {
   const ov = v.overview;
   const box = $('up-slots');
   box.replaceChildren();
   if (!ov) {
-    box.append(el('p', 'up-none', 'Load your build first.'));
+    box.append(el('p', 'up-msg', 'Load your build first.'));
     updateUpNote();
     return;
   }
-  const chosen = new Set(upForm.slots ?? defaultSlots(ov));
+  const chosen = new Set(chosenSlots());
   for (const slot of UPGRADE_SLOTS) {
-    const item = ov.gear.find((g) => g.slot === slot)?.item ?? null;
-    const b = el('button', `up-slot${chosen.has(slot) ? ' on' : ''}`, el('span', 's1', slot), el('span', 's2', item ? (item.title ?? item.name) : 'empty'));
+    const item = gearItem(slot);
+    const b = el(
+      'button',
+      `up-slot${chosen.has(slot) ? ' on' : ''}`,
+      gearThumb(slot),
+      el('span', 'up-slot-text', el('span', 's1', slot), el('span', `s2${item ? ` ${rarityCls(item)}` : ''}`, item ? (item.title ?? item.name) : 'empty')),
+    );
+    b.setAttribute('aria-pressed', String(chosen.has(slot)));
     b.addEventListener('click', () => {
-      const now = new Set(upForm.slots ?? defaultSlots(ov));
+      const now = new Set(chosenSlots());
       if (now.has(slot)) now.delete(slot);
       else now.add(slot);
-      upForm.slots = UPGRADE_SLOTS.filter((s) => now.has(s));
-      saveUpForm();
-      renderUpgradeSlots(v);
+      setSlots([...now]);
     });
     box.append(b);
   }
   updateUpNote();
 }
 
-function chosenSlots(): string[] {
-  const ov = current?.overview;
-  return ov ? (upForm.slots ?? defaultSlots(ov)) : [];
+function setSlots(slots: string[]) {
+  upForm.slots = UPGRADE_SLOTS.filter((s) => slots.includes(s));
+  saveUpForm();
+  if (current) renderUpgradeSlots(current);
 }
 
 function updateUpNote() {
   const n = chosenSlots().length;
-  $('up-note').textContent = n ? `${n} slot${n === 1 ? '' : 's'} · up to ${n * 2} trade searches` : '';
+  $('up-note').textContent = upRun.running
+    ? ''
+    : n
+      ? `${n} slot${n === 1 ? '' : 's'} · up to ${n * 2} trade searches${n > 6 ? ' – a second full run right after may hit the trade site’s limit' : ''}`
+      : 'Pick at least one slot.';
+  $<HTMLButtonElement>('up-start').disabled = upRun.running || n === 0 || !current?.overview;
 }
 
 const signed = (n: number) => `${n > 0 ? '+' : ''}${n.toFixed(1)}%`;
 const tone = (n: number) => (n >= 0.5 ? 'pos' : n <= -0.5 ? 'neg' : 'zero');
 const CUR_SHORT: Record<string, string> = { divine: 'div', exalted: 'ex', chaos: 'chaos' };
 
+function priceCell(c: UpgradeCandidate): HTMLElement {
+  if (!c.price) return el('span', 'price', '–');
+  return el('span', `price cur-${c.price.currency}`, fmt(c.price.amount), el('small', '', CUR_SHORT[c.price.currency] ?? c.price.currency));
+}
+
 function candidateRow(c: UpgradeCandidate): HTMLElement {
-  const name = el('span', `name rarity-${c.item.rarity.toLowerCase()}`, c.item.title && c.item.title !== c.item.base ? `${c.item.title}, ${c.item.base}` : c.item.base);
-  attachTooltip(name, c.item);
-  const price = c.price ? `${fmt(c.price.amount)} ${CUR_SHORT[c.price.currency] ?? c.price.currency}` : '–';
+  const hasTitle = !!c.item.title && c.item.title !== c.item.base;
+  const name = el('span', `name rarity-${c.item.rarity.toLowerCase()}`, hasTitle ? c.item.title! : c.item.base);
+  const subText = c.blocking.length
+    ? el('span', 'sub why', `✗ ${c.blocking.join(' · ')}`)
+    : c.warnings.length
+      ? el('span', 'sub why soft', `⚠ ${c.warnings.join(' · ')}`)
+      : el('span', 'sub', [hasTitle ? c.item.base : '', c.listedAt ? `listed ${ageText(c.listedAt)}` : ''].filter(Boolean).join(' · '));
+  const who = el('span', 'who', name, subText);
+  attachTooltip(who, c.item);
   const row = el(
     'div',
     `up-cand ${c.upgrade ? 'good' : 'meh'}`,
-    name,
-    el('span', 'price', price),
+    thumb(c.item, c.icon),
+    who,
+    priceCell(c),
     el('span', `num ${tone(c.dpsPct)}`, signed(c.dpsPct)),
     el('span', `num ${tone(c.ehpPct)}`, signed(c.ehpPct)),
     el('span', `gain ${tone(c.gain)}`, signed(c.gain)),
+    el('span', 'open', c.tradeUrl ? '↗' : ''),
   );
-  if (c.blocking.length) row.append(el('span', 'why', c.blocking.join(' · ')));
-  else if (c.warnings.length) row.append(el('span', 'why soft', c.warnings.join(' · ')));
   if (c.tradeUrl) {
     // Ganze Zeile klickbar: öffnet die Trade-Seite (im Browser) mit genau diesem Angebot oben.
     const url = c.tradeUrl;
@@ -788,39 +835,58 @@ function candidateRow(c: UpgradeCandidate): HTMLElement {
     const open = () => window.open(url, '_blank');
     row.addEventListener('click', open);
     row.addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open()));
-    row.append(el('span', 'open', '↗'));
   }
   return row;
 }
 
+const COLS = () =>
+  el('div', 'up-cols', el('span', ''), el('span', '', 'Item'), el('span', '', 'Price'), el('span', '', 'DPS'), el('span', '', 'eHP'), el('span', '', 'Overall'), el('span', ''));
+
+/** Upgrades only show the closest few others; without an upgrade the closest listings are shown. */
+const OTHERS_WITH_UPGRADE = 2;
+
 function slotResult(r: UpgradeSlotResult): HTMLElement {
-  const head = el('div', 'up-slot-head', el('h3', '', r.slot, el('span', 'wears', r.current ? `wears ${r.current}` : 'empty')));
-  const meta = el('div', 'up-meta');
-  if (!r.error) meta.append(`${fmt(r.total)} listing${r.total === 1 ? '' : 's'} · ${r.evaluated} calculated`);
+  const ups = r.candidates.filter((c) => c.upgrade);
+  const others = r.candidates.filter((c) => !c.upgrade);
+  const best = ups[0];
+
+  const sub = el('div', 'up-slot-sub');
+  if (r.current) sub.append(el('span', 'cur', r.current), ' · ');
+  sub.append(r.error ? 'search failed' : `${fmt(r.total)} listing${r.total === 1 ? '' : 's'} · ${r.evaluated} calculated${r.overBudget ? ` · ${r.overBudget} over budget left out` : ''}`);
+
+  const head = el(
+    'div',
+    'up-slot-head',
+    gearThumb(r.slot),
+    el('div', '', el('div', 'up-slot-title', r.slot), sub),
+    r.error ? el('span', '') : best ? el('span', 'up-best yes', `Best ${signed(best.gain)}`) : el('span', 'up-best no', 'No upgrade in budget'),
+  );
   if (r.tradeUrl) {
-    const a = el('a', '', 'Open on trade site');
+    const a = el('a', 'btn sm ghost', 'Search on trade site ↗');
     a.href = r.tradeUrl;
     a.target = '_blank';
     a.rel = 'noreferrer';
-    meta.append(a);
+    head.append(a);
+  } else {
+    head.append(el('span', ''));
   }
-  head.append(meta);
-  const card = el('section', 'card up-slot-card', head);
+
+  const card = el('section', `card up-slot-card${best ? ' has-upgrade' : ''}`, head);
   if (r.error) {
-    card.append(el('p', 'up-error', r.error));
+    card.append(el('p', 'up-msg error', r.error));
     return card;
   }
   if (r.candidates.length === 0) {
-    card.append(el('p', 'up-none', r.total ? 'None of the listings could be calculated.' : 'Nothing within the budget has enough of the mods your build needs.'));
+    card.append(el('p', 'up-msg', r.total ? 'None of the listings within the budget could be calculated.' : 'Nothing within the budget has enough of the mods your build needs.'));
     return card;
   }
-  if (!r.candidates.some((c) => c.upgrade)) {
-    card.append(el('p', 'up-none', `No upgrade among the ${r.evaluated} listings calculated (cheapest and spread up to the budget) – the closest:`));
+  card.append(COLS());
+  if (ups.length) {
+    card.append(el('div', 'up-list', ...ups.map(candidateRow)));
+    if (others.length) card.append(el('div', 'up-divider', 'Closest others'), el('div', 'up-list', ...others.slice(0, OTHERS_WITH_UPGRADE).map(candidateRow)));
+  } else {
+    card.append(el('div', 'up-list', ...others.map(candidateRow)));
   }
-  card.append(
-    el('div', 'up-head-row', el('span', '', 'Item'), el('span', '', 'Price'), el('span', '', 'DPS'), el('span', '', 'eHP'), el('span', '', 'Overall')),
-    el('div', 'up-list', ...r.candidates.map(candidateRow)),
-  );
   return card;
 }
 
@@ -831,24 +897,48 @@ const STEP_TEXT = {
   evaluate: 'calculating in your build',
   wait: 'waiting for the trade site',
 } as const;
+const STEP_SHARE = { weights: 0.1, search: 0.3, wait: 0.3, fetch: 0.6, evaluate: 0.9 } as const;
 
 function renderUpgrades(r: UpgradeRun) {
   upRun = r;
-  $<HTMLButtonElement>('up-start').disabled = r.running;
   $('up-cancel').hidden = !r.running;
   const p = r.progress;
-  let text = '';
+  const progress = $('up-progress');
+  progress.replaceChildren();
   if (r.running) {
-    text = p ? `${p.slot} (${p.index + 1}/${p.count}): ${STEP_TEXT[p.step]}${p.step === 'wait' && p.waitS ? ` – ${p.waitS} s` : ''}…` : 'Starting…';
-  } else if (r.league && !r.error) {
-    const found = r.results.reduce((n, x) => n + x.candidates.filter((c) => c.upgrade).length, 0);
-    text = `Done – ${found} upgrade${found === 1 ? '' : 's'} found.`;
+    if (p) progress.append(el('b', '', `${p.slot}`), ` (${p.index + 1} of ${p.count}) – ${STEP_TEXT[p.step]}${p.step === 'wait' && p.waitS ? `, ${p.waitS} s` : ''}…`);
+    else progress.append('Starting…');
+  } else if (r.league) {
+    progress.append(`Searched ${r.results.length} slot${r.results.length === 1 ? '' : 's'} in ${r.league}`);
   }
-  if (r.league && r.budgetExalted) text += `  ${r.league} · budget ${fmt(r.budgetExalted)} ex${r.exaltedPerDivine ? ` (1 div = ${fmt(r.exaltedPerDivine)} ex)` : ''}`;
-  $('up-progress').textContent = text;
+  if (r.budgetExalted && r.exaltedPerDivine && r.league) progress.append(` · budget ${fmt(r.budgetExalted)} ex (1 div = ${fmt(r.exaltedPerDivine)} ex)`);
+  const meter = $('up-meter');
+  meter.hidden = !r.running;
+  $('up-meter-fill').style.width = p ? `${Math.round(((p.index + STEP_SHARE[p.step]) / p.count) * 100)}%` : '3%';
+  updateUpNote();
   if (r.error && !r.running) message(r.error, 'error');
-  // Slots mit Upgrade zuerst, sonst in Suchreihenfolge.
-  const sorted = [...r.results].sort((a, b) => Number(b.candidates.some((c) => c.upgrade)) - Number(a.candidates.some((c) => c.upgrade)));
+
+  // Zusammenfassung über alle Slots.
+  const summary = $('up-summary');
+  const found = r.results.flatMap((x) => x.candidates.filter((c) => c.upgrade).map((c) => ({ slot: x.slot, c })));
+  summary.hidden = r.results.length === 0 || r.running;
+  if (!summary.hidden) {
+    const top = [...found].sort((a, b) => b.c.gain - a.c.gain)[0];
+    summary.className = `up-summary${found.length ? ' found' : ''}`;
+    summary.replaceChildren(
+      el('span', 'big', found.length ? `${found.length} upgrade${found.length === 1 ? '' : 's'}` : 'No upgrades'),
+      el(
+        'span',
+        '',
+        found.length
+          ? `in ${new Set(found.map((f) => f.slot)).size} of ${r.results.length} slots · best: ${top.slot} ${signed(top.c.gain)}${top.c.price ? ` for ${fmt(top.c.price.amount)} ${CUR_SHORT[top.c.price.currency] ?? top.c.price.currency}` : ''}`
+          : 'within this budget – try a higher budget or other slots.',
+      ),
+    );
+  }
+  // Slots mit Upgrade zuerst (bester Gewinn zuerst), sonst in Suchreihenfolge.
+  const bestGain = (x: UpgradeSlotResult) => x.candidates.find((c) => c.upgrade)?.gain ?? -Infinity;
+  const sorted = [...r.results].sort((a, b) => bestGain(b) - bestGain(a));
   $('up-results').replaceChildren(...sorted.map(slotResult));
 }
 
@@ -857,7 +947,8 @@ function syncUpForm() {
   for (const b of document.querySelectorAll<HTMLButtonElement>('#up-currency button')) b.classList.toggle('active', b.dataset.cur === upForm.currency);
   const d = Math.round(upForm.dpsWeight * 100);
   $<HTMLInputElement>('up-weight').value = String(d);
-  $('up-weight-text').textContent = `${d}% damage · ${100 - d}% defence`;
+  $('up-def-text').replaceChildren('Defence ', el('b', '', `${100 - d}%`));
+  $('up-dmg-text').replaceChildren(el('b', '', `${d}%`), ' Damage');
   $<HTMLInputElement>('up-instant').checked = upForm.instantOnly;
 }
 syncUpForm();
@@ -885,6 +976,8 @@ $('up-instant').addEventListener('change', (e) => {
   upForm.instantOnly = (e.target as HTMLInputElement).checked;
   saveUpForm();
 });
+$('up-all').addEventListener('click', () => setSlots([...UPGRADE_SLOTS]));
+$('up-none-btn').addEventListener('click', () => setSlots([]));
 $('up-start').addEventListener('click', () => {
   if (!current?.overview || upRun.running) return;
   const budget = Number($<HTMLInputElement>('up-budget').value);

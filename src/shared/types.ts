@@ -261,6 +261,8 @@ export interface UpgradeCandidate {
   listedAt?: string;
   /** The trade site with this listing on top (same search, this seller). */
   tradeUrl?: string;
+  /** Item picture on GGG's CDN. */
+  icon?: string;
 }
 
 export interface UpgradeSlotResult {
@@ -271,6 +273,8 @@ export interface UpgradeSlotResult {
   total: number;
   /** How many of them Path of Building calculated. */
   evaluated: number;
+  /** Fetched listings left out because they cost more than the budget (the trade site converts prices its own way). */
+  overBudget?: number;
   /** The search on the trade site (to buy by hand). */
   tradeUrl?: string;
   /** Best first; at most a handful. */

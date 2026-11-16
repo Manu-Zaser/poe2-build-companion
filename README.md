@@ -26,7 +26,9 @@ to search. One click on **Find upgrades** then, per slot:
    resistance below the cap, miss an attribute requirement, overdraw spirit or lose movement speed are never shown
    as upgrades.
 
-Buying stays with you: each slot links its search on the trade site. The search waits for the trade site's rate
+Buying stays with you: click a listing to open the trade site with that listing on top (each slot also links its
+whole search). Listings above the budget are left out even if the trade site lets them through – it converts
+prices with its own exchange rate. The search waits for the trade site's rate
 limits and stops (keeping what it found) if a limit would be exceeded. Prices are converted with poe.ninja's
 exchange rates.
 
@@ -121,7 +123,7 @@ npx electron scripts/run-hidden.cjs scripts/ui-check.cjs <output folder>     # c
 npx electron scripts/run-hidden.cjs scripts/check-ui.cjs <output folder>     # item check and overlay
 npx electron scripts/run-hidden.cjs scripts/target-ui.cjs <output folder>    # target build and fit checklist
 npx electron scripts/run-hidden.cjs scripts/file-ui.cjs <output folder>      # PoB file source (own test folder)
-npx electron scripts/run-hidden.cjs scripts/upgrades-ui.cjs <output folder>  # upgrade search (LIVE trade site, 2 slots)
+npx electron scripts/run-hidden.cjs scripts/upgrades-ui.cjs <output folder>  # upgrades page (offline; UP_LIVE=1 searches the trade site)
 ```
 
 The tests never register the global hotkey and never send keys; the item check is called with fixture texts.

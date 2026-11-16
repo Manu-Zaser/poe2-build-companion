@@ -126,8 +126,18 @@ export async function searchSlot(
     check();
   }
 
+  // Die Trade-Seite rechnet den Preisfilter mit ihrem eigenen Divine-Kurs um, der deutlich von poe.ninja
+  // abweichen kann – darum hier noch einmal selbst gegen das Budget prüfen.
+  const budgetDivine = req.currency === 'divine' ? req.budget : req.budget / deps.rates.exaltedPerDivine;
+  const inBudget = listings.filter((l) => {
+    const p = l.listing.price;
+    const d = p ? toDivine(deps.rates, p.amount, p.currency) : null;
+    return d === null || d <= budgetDivine * 1.001;
+  });
+  result.overBudget = listings.length - inBudget.length;
+
   const items: { key: string; itemText: string }[] = [];
-  for (const l of listings) {
+  for (const l of inBudget) {
     try {
       items.push({ key: l.id, itemText: tradeItemToPob(l.item as unknown as TradeItem) });
     } catch {
@@ -161,6 +171,7 @@ export async function searchSlot(
         warnings: verdict.warnings.filter((w) => !s.blocking.includes(w)),
         changes: verdict.changes,
         ...(l.listing.indexed ? { listedAt: l.listing.indexed } : {}),
+        ...(typeof l.item.icon === 'string' && l.item.icon.startsWith('https://web.poecdn.com/') ? { icon: l.item.icon } : {}),
         ...(used && l.listing.account?.name ? { tradeUrl: listingUrl(deps.league, used, l.listing.account.name, typeof l.item.baseType === 'string' ? l.item.baseType : undefined) } : {}),
       },
     });
