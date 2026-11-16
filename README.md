@@ -23,6 +23,7 @@ resistances …; a unique: that unique).
   "+x% to all Elemental Resistances" covers a single elemental resistance. Filler stats (item rarity, light radius,
   stun threshold, on-kill effects …) are shown in grey and do not count.
 
+## Item check (phase 2)
 
 Hover over an item in game and press the hotkey (default **Alt+D**, changeable on the *Item check* page). The
 overlay answers within a fraction of a second:
@@ -77,7 +78,14 @@ CDN (web.poecdn.com), with the links poe.ninja provides.
 
 ## Running from source
 
+Hotkey handling, the one-keystroke item copy, the Win32 helpers and logging come from the shared
+[`@poe2/core`](https://github.com/Manu-Zaser/poe2-core) package (also used by PoE2 Price Check). Clone it **next to**
+this repository – the tool references it as `../core`:
+
 ```bash
+git clone https://github.com/Manu-Zaser/poe2-core.git core
+git clone https://github.com/Manu-Zaser/poe2-build-companion.git build-check
+cd build-check
 git submodule update --init --depth 1
 npm install
 npm start
@@ -104,14 +112,16 @@ src/engine/host.ts           Engine process: loads PoB's own LuaJIT (runtime/lua
                              stdin/stdout. Started by the app as Electron in Node mode – no extra runtime.
 src/engine/bridge.lua        Lua side: boots PoB headless; commands "load", "overview", "compare", "equip"
 src/main/                    Electron main process: window, storage, engine client, poe.ninja refresh, PoB build
-                             files (pobfile.ts: find, list, read, watch), hotkey,
-                             overlay window, one copy keystroke (win32.ts, from Price Check)
+                             files (pobfile.ts: find, list, read, watch), hotkey, overlay window
 src/shared/                  Build code decoding, poe.ninja lookup, verdict and warnings, target build and fit
-                             (targets.ts), hotkey helpers, types
+                             (targets.ts), types
 src/renderer/                Character, build source and item check pages; overlay
+../core (@poe2/core)         Shared with Price Check: hotkey helpers, one copy keystroke (Ctrl+Alt+C) and window
+                             focus, reading the item text, log file
 ```
 
-Settings and the last build are stored in `%APPDATA%\poe2-build-companion\companion.json`.
+Settings and the last build are stored in `%APPDATA%\PoE2 Build Companion\companion.json`; the log file
+`companion.log` is in the same folder.
 
 ## Phase 0 results (November 2026, PoB PoE2 v0.23.1)
 
