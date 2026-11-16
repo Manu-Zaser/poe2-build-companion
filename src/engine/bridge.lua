@@ -221,6 +221,9 @@ local function passives()
 	return { points = used - ws1 - ws2 + math.max(ws1, ws2), weaponSetPoints = math.max(ws1, ws2), ascendancyPoints = ascUsed, nodes = nodes }
 end
 
+-- true when ensureMainSkill (below) had to pick the main skill because PoB's selection does no damage.
+local mainSkillAuto = false
+
 local function mainSkillName()
 	local env = build.calcsTab.mainEnv
 	local skill = env and env.player and env.player.mainSkill
@@ -236,6 +239,7 @@ local function overview()
 		ascendancy = build.spec and build.spec.curAscendClassName,
 		level = build.characterLevel,
 		mainSkill = mainSkillName(),
+		mainSkillAuto = mainSkillAuto or nil,
 		weaponSet = build.calcsTab.mainEnv and build.calcsTab.mainEnv.weaponSet or 1,
 		stats = pickStats(build.calcsTab.mainOutput),
 		skills = skillDps(),
@@ -287,12 +291,31 @@ local function applyEquips(equips)
 	return results
 end
 
+-- If the main skill selected in PoB does no damage (e.g. a buff or aura group is selected), all DPS
+-- changes would be 0. Then the skill group with the highest DPS becomes the main skill – in this copy only.
+local function ensureMainSkill()
+	mainSkillAuto = false
+	local out = build.calcsTab.mainOutput
+	if not out or (out.CombinedDPS or 0) >= 1 or (out.TotalDPS or 0) >= 1 then
+		return
+	end
+	local best = skillDps()[1]
+	if not best then
+		return
+	end
+	build.mainSocketGroup = best.group
+	build.buildFlag = true
+	runCallback("OnFrame")
+	mainSkillAuto = true
+end
+
 function handlers.load(req)
 	loadBuildFromXML(req.xml, req.name or "")
 	if not build.calcsTab.mainOutput then
 		error("The build could not be calculated")
 	end
 	local equips = applyEquips(req.equips)
+	ensureMainSkill()
 	local res = overview()
 	res.equips = #equips > 0 and equips or JSON_NULL
 	return res
@@ -387,7 +410,9 @@ function handlers.upgradeQuery(req)
 	gen.requesterContext = {}
 	gen:StartQuery(slot, {
 		statWeights = {
-			{ stat = "FullDPS", weightMult = req.dpsWeight or 1.0 },
+			-- The main skill's DPS, as the item check and the ranking use it (PoB's "FullDPS" only counts
+			-- skills ticked "Include in Full DPS", which many builds have none of).
+			{ stat = "CombinedDPS", weightMult = req.dpsWeight or 1.0 },
 			{ stat = "TotalEHP", weightMult = req.ehpWeight or 0.5 },
 		},
 		maxPrice = req.maxPrice,
@@ -411,16 +436,40 @@ function handlers.upgradeQuery(req)
 	end
 	-- PoB sorted modWeights by their effect (meanStatDiff), most valuable first. weight = effect per point,
 	-- so effect / weight = the roll PoB tested (midpoint of the mod's range on this item category).
+	-- Trade stat id → its text ("#% to Cold Resistance"), to group mods that are alternatives.
+	local texts = {}
+	for _, list in pairs(gen.modData or {}) do
+		for _, entry in pairs(list) do
+			if entry.tradeMod and entry.tradeMod.id then
+				texts[entry.tradeMod.id] = entry.tradeMod.text
+			end
+		end
+	end
 	local mods = {}
 	for i, m in ipairs(gen.modWeights) do
 		if i > 30 then
 			break
 		end
-		mods[i] = { id = m.tradeModId, weight = m.weight, effect = m.meanStatDiff, testedValue = m.weight ~= 0 and round(m.meanStatDiff / m.weight, 2) or JSON_NULL }
+		mods[i] = {
+			id = m.tradeModId,
+			text = texts[m.tradeModId] or JSON_NULL,
+			weight = m.weight,
+			effect = m.meanStatDiff,
+			testedValue = m.weight ~= 0 and round(m.meanStatDiff / m.weight, 2) or JSON_NULL,
+		}
 	end
+	-- Defences of the worn base: local "% increased Evasion" etc. only work on a base that has them.
+	local existing = build.itemsTab.items[slot.selItemId]
+	local armour = existing and existing.base and existing.base.armour
 	return {
 		query = { query = result.query, sort = { ["statgroup.0"] = "desc" } },
 		mods = mods,
+		base = existing and existing.baseName or JSON_NULL,
+		defences = armour and {
+			armour = armour.Armour ~= nil,
+			evasion = armour.Evasion ~= nil,
+			energyShield = armour.EnergyShield ~= nil,
+		} or JSON_NULL,
 	}
 end
 

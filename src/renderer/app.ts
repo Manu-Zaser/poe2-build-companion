@@ -759,6 +759,17 @@ function renderUpgradeSlots(v: BuildView) {
     updateUpNote();
     return;
   }
+  // Wessen DPS zählt – wichtig, wenn PoB keinen Hauptskill mit Schaden ausgewählt hat.
+  const main = ov.skills.find((k) => k.main) ?? ov.skills[0];
+  const skillNote = $('up-skill');
+  skillNote.hidden = !main;
+  if (main) {
+    skillNote.replaceChildren(
+      'Damage counts for ',
+      el('b', '', main.name),
+      ov.mainSkillAuto ? ' – picked automatically: the main skill selected in Path of Building does no damage.' : ' (your main skill in Path of Building).',
+    );
+  }
   const chosen = new Set(chosenSlots());
   for (const slot of UPGRADE_SLOTS) {
     const item = gearItem(slot);
@@ -872,6 +883,9 @@ function slotResult(r: UpgradeSlotResult): HTMLElement {
   }
 
   const card = el('section', `card up-slot-card${best ? ' has-upgrade' : ''}`, head);
+  if (r.searched?.length) {
+    card.append(el('div', 'up-searched', el('span', 'up-label', 'Searched for'), ...r.searched.map((x) => el('span', 'chip', x))));
+  }
   if (r.error) {
     card.append(el('p', 'up-msg error', r.error));
     return card;

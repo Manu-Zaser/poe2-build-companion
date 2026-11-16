@@ -2,11 +2,14 @@
  * Upgrade search: which items within a budget are better than what the build wears?
  *
  * 1. Path of Building weighs every mod that can roll on the slot (TradeQueryGenerator, see bridge.lua).
- * 2. A weighted-sum trade search is too complex for anonymous requests, so the most valuable mods become a
- *    "count" search instead: items within the budget that have at least N of the top mods with a decent
- *    roll, cheapest first. (No login, no POESESSID, no PoB OAuth token.)
- * 3. PoB calculates every candidate exactly; the ranking below uses those numbers only.
+ * 2. Those weights become a short list of stats that matter (searchstats.ts: variants merged into the trade
+ *    site's pseudo totals, defence mods only for the base's defences, minor stats left out).
+ * 3. A weighted-sum trade search is too complex for anonymous requests, so they become a "count" search:
+ *    items within the budget that have at least N of the stats with a decent roll, cheapest first.
+ *    (No login, no POESESSID, no PoB OAuth token.)
+ * 4. PoB calculates every candidate exactly; the ranking below uses those numbers only.
  */
+import type { SearchStat } from './searchstats';
 import type { SlotVerdict } from './verdict';
 
 export interface TradeStatFilter {
@@ -35,6 +38,8 @@ export interface TradeQuery {
 export interface PobModWeight {
   /** Trade stat id, e.g. "explicit.stat_3299347043". */
   id: string;
+  /** Trade stat text, e.g. "#% to Cold Resistance" (null if PoB had none). */
+  text?: string | null;
   /** Effect per point of the mod. */
   weight: number;
   /** Effect of the tested roll (PoB's weighted DPS/EHP gain ×1000). */
@@ -46,29 +51,33 @@ export interface PobModWeight {
 export interface AnonymousQueryOptions {
   /** Budget per item as Exalted equivalent (the trade site's default price unit for PoE2). */
   maxExalted: number;
-  /** How many of PoB's most valuable mods to search for. */
-  topMods?: number;
-  /** How many of them an item must have. */
+  /** How many of the stats an item must have. */
   minCount?: number;
   /** A mod only counts with at least this share of PoB's tested (middle) roll. */
   rollShare?: number;
   /** Stats every candidate must have (e.g. movement speed on boots). */
   required?: TradeStatFilter[];
+  /** Trade site equipment filters, e.g. { ev: { min: 1 } } to stay on bases with the same defences. */
+  equipment?: Record<string, { min: number }> | null;
 }
 
-export const DEFAULT_TOP_MODS = 8;
 export const DEFAULT_MIN_COUNT = 3;
 export const DEFAULT_ROLL_SHARE = 0.7;
 
 /**
- * Searches tried one after another until enough listings match: first strict (4 of the top mods with at
- * least PoB's middle roll), then looser. Strict first because the cheapest listings of a loose search are
- * mostly junk; at most two searches per slot keep the trade site's search limit (5 per 10 s) in reach.
+ * Searches tried one after another until enough listings match: first strict (4 of the stats with a good
+ * roll), then looser (one stat less, 70 % of the roll). Strict first because the cheapest listings of a loose
+ * search are mostly junk; at most two searches per slot keep the trade site's search limit in reach.
  */
 export const QUERY_STEPS: readonly { minCount: number; rollShare: number }[] = [
   { minCount: 4, rollShare: 1 },
   { minCount: 3, rollShare: 0.7 },
 ];
+
+/** How many of n stats a step asks for: never all of few stats in the loose step. */
+export function countFor(step: { minCount: number }, n: number, loose: boolean): number {
+  return Math.max(1, Math.min(step.minCount, loose ? n - 1 : n));
+}
 /** A step with at least this many results is used as it is. */
 export const ENOUGH_RESULTS = 20;
 /** Listings fetched and calculated per slot (10 per fetch). */
@@ -123,30 +132,31 @@ export function movementSpeedOf(modTexts: string[]): number {
 }
 
 /**
- * Builds a search the trade site accepts without login: a "count" group with PoB's top mods (each with a
- * minimum roll), required stats in an "and" group, the budget as Exalted-equivalent price limit (no
- * currency option – otherwise only listings priced in that very currency would match), cheapest first.
+ * Builds a search the trade site accepts without login: a "count" group with the stats that matter (each with
+ * a minimum roll), required stats in an "and" group, the base's defences, the budget as Exalted-equivalent
+ * price limit (no currency option – otherwise only listings priced in that very currency would match),
+ * cheapest first.
  */
-export function anonymousUpgradeQuery(pob: TradeQuery, mods: PobModWeight[], opts: AnonymousQueryOptions): TradeQuery {
+export function anonymousUpgradeQuery(pob: TradeQuery, stats: SearchStat[], opts: AnonymousQueryOptions): TradeQuery {
   const share = opts.rollShare ?? DEFAULT_ROLL_SHARE;
-  const top = mods.filter((m) => m.weight > 0).slice(0, opts.topMods ?? DEFAULT_TOP_MODS);
-  if (top.length === 0) throw new Error('Path of Building found no mods that improve this slot');
+  if (stats.length === 0) throw new Error('Path of Building found no mods that improve this slot');
 
-  const countFilters: TradeStatFilter[] = top.map((m) => {
-    const min = m.testedValue !== null ? Math.floor(m.testedValue * share) : 0;
+  const countFilters: TradeStatFilter[] = stats.map((m) => {
+    const min = m.value !== null ? Math.floor(m.value * share) : 0;
     return min >= 1 ? { id: m.id, value: { min } } : { id: m.id };
   });
 
   const filters: NonNullable<TradeQuery['query']['filters']> = {};
   const type = pob.query.filters?.type_filters;
   if (type) filters.type_filters = { filters: { ...type.filters } };
+  if (opts.equipment) filters.equipment_filters = { filters: { ...opts.equipment } };
   filters.trade_filters = { filters: { price: { max: Math.max(1, Math.floor(opts.maxExalted)) } } };
 
-  const stats: TradeStatGroup[] = [{ type: 'count', value: { min: Math.min(opts.minCount ?? DEFAULT_MIN_COUNT, top.length) }, filters: countFilters }];
-  if (opts.required?.length) stats.push({ type: 'and', filters: opts.required });
+  const stats_: TradeStatGroup[] = [{ type: 'count', value: { min: Math.min(opts.minCount ?? DEFAULT_MIN_COUNT, stats.length) }, filters: countFilters }];
+  if (opts.required?.length) stats_.push({ type: 'and', filters: opts.required });
 
   return {
-    query: { status: pob.query.status ?? { option: 'securable' }, filters, stats },
+    query: { status: pob.query.status ?? { option: 'securable' }, filters, stats: stats_ },
     sort: { price: 'asc' },
   };
 }

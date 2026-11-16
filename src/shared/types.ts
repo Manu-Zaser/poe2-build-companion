@@ -81,6 +81,8 @@ export interface Overview {
   ascendancy?: string;
   level?: number;
   mainSkill?: string;
+  /** The main skill selected in PoB does no damage, so the skill with the highest DPS is used instead. */
+  mainSkillAuto?: boolean;
   weaponSet: number;
   stats: Stats;
   skills: SkillDps[];
@@ -277,6 +279,8 @@ export interface UpgradeSlotResult {
   overBudget?: number;
   /** The search on the trade site (to buy by hand). */
   tradeUrl?: string;
+  /** What was searched for, most valuable first (e.g. "Cold resistance", "x% increased Attack Speed"). */
+  searched?: string[];
   /** Best first; at most a handful. */
   candidates: UpgradeCandidate[];
   error?: string;

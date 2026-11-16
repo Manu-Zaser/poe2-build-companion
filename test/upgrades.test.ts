@@ -6,6 +6,7 @@ import type { CurrencyRates } from '@poe2/core/ninja';
 import { escapeGGG, tradeItemToPob, type TradeItem } from '../src/shared/tradeitem';
 import {
   anonymousUpgradeQuery,
+  countFor,
   ENOUGH_RESULTS,
   MOVEMENT_SPEED_STAT,
   listingUrl,
@@ -17,6 +18,7 @@ import {
   type PobModWeight,
   type TradeQuery,
 } from '../src/shared/upgrades';
+import { defenceFilters, searchStats, type SearchStat } from '../src/shared/searchstats';
 import { blockingWarnings, judgeSlot } from '../src/shared/verdict';
 import { runUpgradeSearch, searchSlot, SearchCancelled, type UpgradeDeps } from '../src/main/upgradesearch';
 import type { ItemInfo, Stats, UpgradeRequest } from '../src/shared/types';
@@ -61,35 +63,54 @@ const pobQuery: TradeQuery = {
   sort: { 'statgroup.0': 'desc' },
 };
 const mods: PobModWeight[] = [
-  { id: 'explicit.stat_life', weight: 2, effect: 160, testedValue: 80 },
-  { id: 'explicit.stat_cold', weight: 1, effect: 30, testedValue: 30 },
-  { id: 'explicit.stat_small', weight: 0.5, effect: 0.3, testedValue: 0.6 },
-  { id: 'explicit.stat_useless', weight: 0, effect: 0, testedValue: 10 },
+  { id: 'explicit.stat_life', text: '+# to maximum Life', weight: 2, effect: 160, testedValue: 80 },
+  { id: 'explicit.stat_cold', text: '+#% to Cold Resistance', weight: 2, effect: 60, testedValue: 30 },
+  { id: 'explicit.stat_small', text: '#% increased Stun Threshold', weight: 0.5, effect: 0.3, testedValue: 0.6 },
+  { id: 'explicit.stat_useless', text: '#% increased Light Radius', weight: 0, effect: 0, testedValue: 10 },
+];
+const stats: SearchStat[] = [
+  { id: 'pseudo.pseudo_total_life', label: 'Life', effect: 160, value: 80 },
+  { id: 'pseudo.pseudo_total_cold_resistance', label: 'Cold resistance', effect: 60, value: 30 },
+  { id: 'explicit.stat_small', label: 'Small', effect: 50, value: 0.6 },
 ];
 
 describe('anonymous upgrade search', () => {
   it('builds a count search with minimum rolls, the price limit in Exalted and cheapest first', () => {
-    const q = anonymousUpgradeQuery(pobQuery, mods, { maxExalted: 1098.4, minCount: 3, rollShare: 0.7, required: [{ id: MOVEMENT_SPEED_STAT, value: { min: 30 } }] });
+    const q = anonymousUpgradeQuery(pobQuery, stats, {
+      maxExalted: 1098.4,
+      minCount: 3,
+      rollShare: 0.7,
+      required: [{ id: MOVEMENT_SPEED_STAT, value: { min: 30 } }],
+      equipment: { ev: { min: 1 } },
+    });
     expect(q.sort).toEqual({ price: 'asc' });
     expect(q.query.status).toEqual({ option: 'securable' });
     expect(q.query.filters?.type_filters).toEqual({ filters: { category: { option: 'armour.boots' } } });
+    expect(q.query.filters?.equipment_filters).toEqual({ filters: { ev: { min: 1 } } });
     // No currency option – otherwise only listings priced in that currency would match.
     expect(q.query.filters?.trade_filters).toEqual({ filters: { price: { max: 1098 } } });
     const [count, and] = q.query.stats;
     expect(count.type).toBe('count');
     expect(count.value).toEqual({ min: 3 });
-    // Mods without value for the build are left out; tiny rolls have no minimum.
-    expect(count.filters).toEqual([{ id: 'explicit.stat_life', value: { min: 56 } }, { id: 'explicit.stat_cold', value: { min: 21 } }, { id: 'explicit.stat_small' }]);
+    // Tiny rolls have no minimum.
+    expect(count.filters).toEqual([
+      { id: 'pseudo.pseudo_total_life', value: { min: 56 } },
+      { id: 'pseudo.pseudo_total_cold_resistance', value: { min: 21 } },
+      { id: 'explicit.stat_small' },
+    ]);
     expect(and).toEqual({ type: 'and', filters: [{ id: MOVEMENT_SPEED_STAT, value: { min: 30 } }] });
   });
 
-  it('never asks for more mods than it searches for', () => {
-    const q = anonymousUpgradeQuery(pobQuery, mods, { maxExalted: 100, minCount: 4 });
-    expect(q.query.stats[0].value).toEqual({ min: 3 });
+  it('never asks for more stats than it searches for; loose steps ask for one less', () => {
+    expect(anonymousUpgradeQuery(pobQuery, stats, { maxExalted: 100, minCount: 4 }).query.stats[0].value).toEqual({ min: 3 });
+    expect(countFor({ minCount: 4 }, 8, false)).toBe(4);
+    expect(countFor({ minCount: 3 }, 8, true)).toBe(3);
+    expect(countFor({ minCount: 4 }, 2, false)).toBe(2);
+    expect(countFor({ minCount: 3 }, 2, true)).toBe(1);
   });
 
   it('fails clearly when PoB finds nothing worth searching', () => {
-    expect(() => anonymousUpgradeQuery(pobQuery, [mods[3]], { maxExalted: 100 })).toThrow(/no mods/);
+    expect(() => anonymousUpgradeQuery(pobQuery, [], { maxExalted: 100 })).toThrow(/no mods/);
   });
 
   it('reads movement speed from mod lines', () => {
@@ -108,7 +129,7 @@ describe('anonymous upgrade search', () => {
   });
 
   it('links one listing: same search, limited to the seller and base type', () => {
-    const q = anonymousUpgradeQuery(pobQuery, mods, { maxExalted: 500 });
+    const q = anonymousUpgradeQuery(pobQuery, stats, { maxExalted: 500 });
     const url = listingUrl('Forbidden Rites', q, 'Seller#1234', 'Wanderer Shoes');
     expect(url.startsWith('https://www.pathofexile.com/trade2/search/poe2/Forbidden%20Rites?q=')).toBe(true);
     const back = JSON.parse(decodeURIComponent(url.split('?q=')[1])) as TradeQuery;
@@ -125,6 +146,69 @@ describe('anonymous upgrade search', () => {
 });
 
 const before: Stats = { CombinedDPS: 1000, TotalEHP: 10000, FireResist: 75, MissingFireResist: 0, ColdResist: 70, MissingColdResist: 5, Str: 100, ReqStr: 90, EffectiveMovementSpeedMod: 1.3 };
+
+// PoB's weights for evasion/energy shield boots (shape as the bridge returns them, shortened).
+const bootsMods: PobModWeight[] = [
+  { id: 'explicit.stat_ltr', text: '+#% to Lightning Resistance', weight: 1.48, effect: 38.6, testedValue: 26 },
+  { id: 'explicit.stat_cr', text: '+#% to Cold Resistance', weight: 1.48, effect: 38.6, testedValue: 26 },
+  { id: 'explicit.stat_ccr', text: '+#% to Cold and Chaos Resistances', weight: 2.45, effect: 36.8, testedValue: 15 },
+  { id: 'implicit.stat_all', text: '+#% to all Elemental Resistances', weight: 2.9, effect: 35.3, testedValue: 12 },
+  { id: 'explicit.stat_aees', text: '#% increased Armour, Evasion and Energy Shield', weight: 0.32, effect: 20, testedValue: 63 },
+  { id: 'explicit.stat_ees', text: '#% increased Evasion and Energy Shield', weight: 0.35, effect: 18.7, testedValue: 53 },
+  { id: 'explicit.stat_es', text: '#% increased Energy Shield', weight: 0.35, effect: 18.7, testedValue: 53 },
+  { id: 'explicit.stat_ar', text: '+# to Armour (Local)', weight: 0.1, effect: 15, testedValue: 150 },
+  { id: 'explicit.stat_ev', text: '+# to Evasion Rating (Local)', weight: 0.13, effect: 11.5, testedValue: 91 },
+  { id: 'explicit.stat_life', text: '+# to maximum Life', weight: 0.13, effect: 10.6, testedValue: 80 },
+  { id: 'explicit.stat_str', text: '+# to Strength', weight: 0.2, effect: 4, testedValue: 20 },
+  { id: 'explicit.stat_dmg', text: 'Enemies you Mark take #% increased Damage', weight: 5, effect: 30, testedValue: 6 },
+];
+
+describe('which stats the search looks for', () => {
+  const ees = { armour: false, evasion: true, energyShield: true };
+
+  it('merges resistance variants into the pseudo totals', () => {
+    const s = searchStats(bootsMods, { slot: 'Boots', defences: ees });
+    const ids = s.map((x) => x.id);
+    expect(ids).toContain('pseudo.pseudo_total_cold_resistance');
+    expect(ids).toContain('pseudo.pseudo_total_lightning_resistance');
+    expect(ids).not.toContain('explicit.stat_cr');
+    expect(ids).not.toContain('explicit.stat_ccr');
+    expect(ids).not.toContain('implicit.stat_all');
+    // A single-resistance roll sets the bar; the minimum leaves room for hybrid and all-res mods.
+    expect(s.find((x) => x.id === 'pseudo.pseudo_total_cold_resistance')).toMatchObject({ label: 'Cold resistance', effect: 38.6, value: 15 });
+  });
+
+  it('keeps only the defence mods that work on the base', () => {
+    const ids = searchStats(bootsMods, { slot: 'Boots', defences: ees }).map((x) => x.id);
+    expect(ids).toContain('explicit.stat_ees');
+    expect(ids).not.toContain('explicit.stat_aees');
+    expect(ids).not.toContain('explicit.stat_es');
+    expect(ids).not.toContain('explicit.stat_ar');
+    expect(defenceFilters('Boots', ees)).toEqual({ ev: { min: 1 }, es: { min: 1 } });
+    expect(defenceFilters('Amulet', ees)).toBeNull();
+  });
+
+  it('leaves out stats worth much less than the best one, most valuable first', () => {
+    const s = searchStats(bootsMods, { slot: 'Boots', defences: ees });
+    expect(s[0].effect).toBe(38.6);
+    expect(s.map((x) => x.label)).toContain('Enemies you Mark take x% increased Damage');
+    // Strength (4) and life (10.6) are below 30 % of the best (38.6).
+    expect(s.map((x) => x.id)).not.toContain('pseudo.pseudo_total_strength');
+    expect(s.map((x) => x.id)).not.toContain('pseudo.pseudo_total_life');
+    expect(s.length).toBeLessThanOrEqual(8);
+  });
+
+  it('does not let a base implicit set the bar', () => {
+    const body: PobModWeight[] = [
+      { id: 'implicit.stat_ward', text: '+# to maximum Runic Ward', weight: 0.07, effect: 64, testedValue: 875 },
+      { id: 'explicit.stat_ltr', text: '+#% to Lightning Resistance', weight: 0.8, effect: 20.2, testedValue: 26 },
+      { id: 'explicit.stat_mom', text: '#% of Damage is taken from Mana before Life', weight: 1.3, effect: 19.7, testedValue: 15 },
+      { id: 'implicit.stat_mom', text: '#% of Damage is taken from Mana before Life', weight: 1.2, effect: 9.7, testedValue: 8 },
+    ];
+    const s = searchStats(body, { slot: 'Body Armour', defences: { armour: false, evasion: true, energyShield: false } });
+    expect(s.map((x) => x.id)).toEqual(['implicit.stat_ward', 'pseudo.pseudo_total_lightning_resistance', 'explicit.stat_mom']);
+  });
+});
 
 describe('blocking warnings', () => {
   it('rules out items that newly drop a resistance below the cap or miss attributes', () => {
@@ -244,7 +328,10 @@ describe('upgrade search flow', () => {
     const { deps, searches } = fakes([2, ENOUGH_RESULTS + 5]);
     const r = await searchSlot('Boots', boots, req, deps, { index: 0, count: 1 });
     expect(searches).toHaveLength(2);
-    expect((searches[0] as TradeQuery).query.stats[0].value).toEqual({ min: 3 });
+    // Two stats matter (life, cold resistance): strict asks for both, loose for one.
+    expect(r.searched).toEqual(['Life', 'Cold resistance']);
+    expect((searches[0] as TradeQuery).query.stats[0].value).toEqual({ min: 2 });
+    expect((searches[1] as TradeQuery).query.stats[0].value).toEqual({ min: 1 });
     expect(r.tradeUrl).toMatch(/\/q2$/);
   });
 

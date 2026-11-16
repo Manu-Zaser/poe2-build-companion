@@ -11,6 +11,7 @@ import { tradeItemToPob, type TradeItem } from '../shared/tradeitem';
 import type { ItemInfo, Stats, UpgradeCandidate, UpgradeProgress, UpgradeRequest, UpgradeSlotResult } from '../shared/types';
 import {
   anonymousUpgradeQuery,
+  countFor,
   ENOUGH_RESULTS,
   MOVEMENT_SPEED_STAT,
   listingUrl,
@@ -23,6 +24,7 @@ import {
   type PobModWeight,
   type TradeQuery,
 } from '../shared/upgrades';
+import { defenceFilters, searchStats, type Defences } from '../shared/searchstats';
 import { blockingWarnings, judgeSlot } from '../shared/verdict';
 
 /** Candidates shown per slot. */
@@ -90,7 +92,7 @@ export async function searchSlot(
   const dps = Math.min(1, Math.max(0, req.dpsWeight));
 
   deps.onProgress?.(step('weights'));
-  const pob = await deps.engine<{ query: TradeQuery; mods: PobModWeight[] }>('upgradeQuery', {
+  const pob = await deps.engine<{ query: TradeQuery; mods: PobModWeight[]; defences?: Defences | null }>('upgradeQuery', {
     slot,
     dpsWeight: dps,
     ehpWeight: 1 - dps,
@@ -103,10 +105,17 @@ export async function searchSlot(
   const required = ms > 0 ? [{ id: MOVEMENT_SPEED_STAT, value: { min: ms } }] : [];
   const maxExalted = budgetInExalted(deps.rates, req.budget, req.currency);
 
+  // Nur die Stats, die zählen: Varianten zusammengefasst, Verteidigung passend zur Basis, Kleinkram weg.
+  const defences = pob.defences ?? null;
+  const stats = searchStats(pob.mods, { slot, defences });
+  const equipment = defenceFilters(slot, defences);
+  result.searched = stats.map((x) => x.label);
+
   let found: SearchResponse | null = null;
   let used: TradeQuery | null = null;
-  for (const s of QUERY_STEPS) {
-    const query = anonymousUpgradeQuery(pob.query, pob.mods, { maxExalted, minCount: s.minCount, rollShare: s.rollShare, required });
+  for (const [i, s] of QUERY_STEPS.entries()) {
+    const minCount = countFor(s, stats.length, i > 0);
+    const query = anonymousUpgradeQuery(pob.query, stats, { maxExalted, minCount, rollShare: s.rollShare, required, equipment });
     deps.onProgress?.(step('search'));
     found = await rateLimited(() => deps.trade.search(deps.league, query), deps, step('search'));
     used = query;

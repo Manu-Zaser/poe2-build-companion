@@ -58,6 +58,7 @@ module.exports = (out) => {
     const results = [
       {
         slot: 'Helmet', current: 'Kraken Ward', total: 82, evaluated: 25, overBudget: 5,
+        searched: ['Enemies you Mark take x% increased Damage', 'Fire resistance', 'Cold resistance', 'x% increased Energy Shield', 'x% increased Critical Hit Chance'],
         tradeUrl: 'https://www.pathofexile.com/trade2/search/poe2/Forbidden%20Rites/abc',
         candidates: [
           cand('Loath Visage', 'Sorcerous Tiara', { amount: 9, currency: 'divine' }, 0, 13.4, { warnings: ['Cold resistance drops further below the cap (58% of 81%)'] }),

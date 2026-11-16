@@ -16,15 +16,22 @@ to search. One click on **Find upgrades** then, per slot:
 
 1. Path of Building weighs every mod that can roll on the slot by what it adds to your build (its own trade
    search generator).
-2. The trade site is searched **anonymously** – no login, no POESESSID, never PoB's OAuth token. A weighted search
-   is too complex without login, so the most valuable mods become a "count" search (at least 4 of the top 8 with
-   PoB's middle roll, looser if that finds too little), priced up to the budget. Boots keep at least your current
+2. Those weights become a short list of stats that matter: variants of the same stat are merged into the trade
+   site's totals (single, hybrid and all-resistance mods → "total Cold Resistance"; life, mana, attributes), defence
+   mods count only in the variant that works on your base (and the search stays on bases with the same defences),
+   and stats worth less than 30 % of the best one are left out. The page shows what was searched for.
+3. The trade site is searched **anonymously** – no login, no POESESSID, never PoB's OAuth token. A weighted search
+   is too complex without login, so this is a "count" search (at least 4 of the stats with a good roll, one less
+   and 70 % of the roll if that finds too little), priced up to the budget. Boots keep at least your current
    movement speed.
-3. 30 listings (the cheapest ones plus a spread up to the budget) are calculated one by one in your build, exactly
+4. 30 listings (the cheapest ones plus a spread up to the budget) are calculated one by one in your build, exactly
    like the item check.
-4. The page lists the best per slot with price, DPS, effective HP and overall gain. Items that newly drop a
+5. The page lists the best per slot with price, DPS, effective HP and overall gain. Items that newly drop a
    resistance below the cap, miss an attribute requirement, overdraw spirit or lose movement speed are never shown
    as upgrades.
+
+Damage means your main skill's DPS. If the main skill selected in Path of Building does no damage (e.g. an aura
+group), the skill with the highest DPS is used instead – for the item check too – and the page says so.
 
 Buying stays with you: click a listing to open the trade site with that listing on top (each slot also links its
 whole search). Listings above the budget are left out even if the trade site lets them through – it converts
