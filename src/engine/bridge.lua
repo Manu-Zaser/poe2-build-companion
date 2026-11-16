@@ -343,6 +343,87 @@ function handlers.compare(req)
 	return { item = describeItem(item), slots = results, before = before }
 end
 
+-- Upgrade search, step 2: puts each candidate (PoB item text built from a trade listing) into ONE slot
+-- and recalculates. The build itself is never modified. A candidate that fails to parse or does not fit
+-- the slot gets an error instead of numbers.
+function handlers.evaluate(req)
+	local itemsTab = build.itemsTab
+	local slot = itemsTab.slots[req.slot]
+	if not slot then
+		error("unknown slot " .. tostring(req.slot), 0)
+	end
+	local calcFunc, base = build.calcsTab:GetMiscCalculator()
+	local current = itemsTab.items[slot.selItemId]
+	local results = {}
+	for _, entry in ipairs(req.items or {}) do
+		local ok, res = pcall(function()
+			local item = parseItem(entry.itemText)
+			if not itemsTab:IsItemValidForSlot(item, req.slot) then
+				error("does not fit " .. req.slot, 0)
+			end
+			return { key = entry.key, item = describeItem(item), after = pickStats(calcFunc({ repSlotName = req.slot, repItem = item }, req.fullDps)) }
+		end)
+		results[#results + 1] = ok and res or { key = entry.key, error = tostring(res) }
+	end
+	return { slot = req.slot, replaces = current and current.name or JSON_NULL, before = pickStats(base), results = results }
+end
+
+-- Upgrade search, step 1: PoB's own weighted trade query for one slot (TradeQueryGenerator), run
+-- headless. PoB tests every mod that can roll on the slot's item category against the build and turns
+-- the gain in DPS / effective HP into weights; the price limit becomes a trade price filter.
+-- Only the query is built here – PoB's own trade requests (and its OAuth token) are never used.
+function handlers.upgradeQuery(req)
+	local slot = build.itemsTab.slots[req.slot]
+	if not slot then
+		error("unknown slot " .. tostring(req.slot), 0)
+	end
+	local gen = new("TradeQueryGenerator"):TradeQueryGenerator({ itemsTab = build.itemsTab })
+	-- 1 = instant buyout only ("securable"), 2 = instant buyout and in person ("available")
+	gen.tradeTypeIndex = req.instantOnly == false and 2 or 1
+	local result
+	gen.requesterCallback = function(_, query, err)
+		result = { query = query, error = err }
+	end
+	gen.requesterContext = {}
+	gen:StartQuery(slot, {
+		statWeights = {
+			{ stat = "FullDPS", weightMult = req.dpsWeight or 1.0 },
+			{ stat = "TotalEHP", weightMult = req.ehpWeight or 0.5 },
+		},
+		maxPrice = req.maxPrice,
+		maxPriceType = req.maxPriceType,
+		includeCorrupted = req.includeCorrupted == true,
+		includeRunes = false,
+		includeMirrored = false,
+	})
+	if not gen.calcContext.co then
+		error("this slot is not supported by the upgrade search", 0)
+	end
+	-- PoB normally advances the calculation once per frame; headless we simply run it to the end.
+	while gen.calcContext.co do
+		gen:OnFrame()
+	end
+	if not result then
+		error("the upgrade search produced no query", 0)
+	end
+	if result.error then
+		error(result.error, 0)
+	end
+	-- PoB sorted modWeights by their effect (meanStatDiff), most valuable first. weight = effect per point,
+	-- so effect / weight = the roll PoB tested (midpoint of the mod's range on this item category).
+	local mods = {}
+	for i, m in ipairs(gen.modWeights) do
+		if i > 30 then
+			break
+		end
+		mods[i] = { id = m.tradeModId, weight = m.weight, effect = m.meanStatDiff, testedValue = m.weight ~= 0 and round(m.meanStatDiff / m.weight, 2) or JSON_NULL }
+	end
+	return {
+		query = { query = result.query, sort = { ["statgroup.0"] = "desc" } },
+		mods = mods,
+	}
+end
+
 function __bridge(requestJson)
 	local req = dkjson.decode(requestJson)
 	local handler = req and handlers[req.cmd]

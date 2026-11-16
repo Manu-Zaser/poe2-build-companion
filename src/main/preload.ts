@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { BuildView, OverlayContent, PobFileEntry } from '../shared/types';
+import type { BuildView, OverlayContent, PobFileEntry, UpgradeRequest, UpgradeRun } from '../shared/types';
 
 type Result = { ok: true; view: BuildView } | { ok: false; error: string; view: BuildView };
 
@@ -33,6 +33,14 @@ const api = {
   clearTarget: (): Promise<Result> => ipcRenderer.invoke('target:clear'),
   setHotkey: (acc: string): Promise<Result> => ipcRenderer.invoke('settings:hotkey', acc),
   resetOverlayPosition: (): Promise<Result> => ipcRenderer.invoke('settings:reset-overlay'),
+
+  /** Upgrade search: anonymous trade searches, only on click; buying stays with the user. */
+  getUpgrades: (): Promise<UpgradeRun> => ipcRenderer.invoke('upgrades:get'),
+  startUpgrades: (req: UpgradeRequest): Promise<UpgradeRun> => ipcRenderer.invoke('upgrades:start', req),
+  cancelUpgrades: () => ipcRenderer.send('upgrades:cancel'),
+  onUpgrades: (cb: (r: UpgradeRun) => void) => {
+    ipcRenderer.on('upgrades:changed', (_e, r: UpgradeRun) => cb(r));
+  },
 
   // Overlay
   onOverlayContent: (cb: (c: OverlayContent) => void) => {

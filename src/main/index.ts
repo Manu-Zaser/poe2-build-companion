@@ -21,7 +21,13 @@ import type {
   StoredState,
   StoredTarget,
   TargetView,
+  UpgradeRequest,
+  UpgradeRun,
 } from '../shared/types';
+import { fetchCurrencyRates, fetchLeagues, type CurrencyRates } from '@poe2/core/ninja';
+import { RateLimitError, TradeClient } from '@poe2/core/trade';
+import { UPGRADE_SLOTS } from '../shared/upgrades';
+import { runUpgradeSearch, SearchCancelled } from './upgradesearch';
 import { fitForSlot, parseTargetBuild, type Fit, type TargetBuild } from '../shared/targets';
 import { judgeItem } from '../shared/verdict';
 import { Engine } from './engine';
@@ -466,6 +472,12 @@ function registerHotkey() {
 function registerIpc() {
   ipcMain.handle('view:get', () => view());
 
+  ipcMain.handle('upgrades:get', () => upgradeRun);
+  ipcMain.handle('upgrades:start', (_e, req: unknown) => startUpgradeSearch(req));
+  ipcMain.on('upgrades:cancel', () => {
+    upgradeCancel = true;
+  });
+
   // Reads the clipboard exactly once, when the user clicks the button.
   ipcMain.handle('build:paste', async (): Promise<Result> => {
     const text = (await clipboard.readText()).slice(0, MAX_CODE_LENGTH + 1000);
@@ -614,6 +626,102 @@ function registerIpc() {
   });
 }
 
+// ---------- Upgrade search ----------
+// Only on the user's click: anonymous trade searches (no login, no POESESSID, no PoB OAuth token),
+// within GGG's reported rate limits. Buying stays with the user – the app only links the trade site.
+
+let trade: TradeClient | null = null;
+let ratesCache: CurrencyRates | null = null;
+const RATES_TTL_MS = 30 * 60_000;
+let upgradeRun: UpgradeRun = { running: false, results: [] };
+let upgradeCancel = false;
+
+const pushUpgrades = () => mainWin?.webContents.send('upgrades:changed', upgradeRun);
+
+/** The build's league (poe.ninja builds know it), otherwise the current challenge league. */
+async function tradeLeague(): Promise<string> {
+  if (store.build?.leagueName) return store.build.leagueName;
+  return (await fetchLeagues(userAgent()))[0];
+}
+
+function sanitizeUpgradeRequest(v: unknown): UpgradeRequest | null {
+  if (!v || typeof v !== 'object') return null;
+  const r = v as Record<string, unknown>;
+  const budget = Number(r.budget);
+  if (!Number.isFinite(budget) || budget <= 0 || budget > 100_000) return null;
+  const slots = Array.isArray(r.slots) ? (UPGRADE_SLOTS as readonly string[]).filter((s) => (r.slots as unknown[]).includes(s)) : [];
+  if (slots.length === 0) return null;
+  const dpsWeight = Number(r.dpsWeight);
+  return {
+    budget,
+    currency: r.currency === 'exalted' ? 'exalted' : 'divine',
+    slots,
+    dpsWeight: Number.isFinite(dpsWeight) ? Math.min(1, Math.max(0, dpsWeight)) : 0.5,
+    instantOnly: r.instantOnly !== false,
+  };
+}
+
+async function startUpgradeSearch(raw: unknown): Promise<UpgradeRun> {
+  if (upgradeRun.running) return upgradeRun;
+  const req = sanitizeUpgradeRequest(raw);
+  if (!req) return { running: false, results: [], error: 'Enter a budget and pick at least one slot.' };
+  const ov = overview;
+  if (!ov) return { running: false, results: [], error: 'Load your build first.' };
+
+  upgradeCancel = false;
+  upgradeRun = { running: true, results: [] };
+  pushUpgrades();
+  const started = Date.now();
+  try {
+    const league = await tradeLeague();
+    if (!ratesCache || ratesCache.league !== league || Date.now() - ratesCache.fetchedAt > RATES_TTL_MS) {
+      ratesCache = await fetchCurrencyRates(league, userAgent());
+    }
+    const rates = ratesCache;
+    trade ??= new TradeClient(userAgent());
+    upgradeRun.league = league;
+    upgradeRun.exaltedPerDivine = rates.exaltedPerDivine;
+    upgradeRun.budgetExalted = req.currency === 'exalted' ? req.budget : Math.floor(req.budget * rates.exaltedPerDivine);
+    pushUpgrades();
+    log(`upgrade search: ${req.slots.join(', ')} in ${league}, budget ${req.budget} ${req.currency}`);
+
+    await runUpgradeSearch(req, ov.gear, {
+      engine: async (cmd, args) => (await engine.request(cmd, args, 120_000)).result as never,
+      trade,
+      rates,
+      league,
+      // A different build is loaded → the numbers would be wrong.
+      cancelled: () => upgradeCancel || overview !== ov,
+      onProgress: (p) => {
+        upgradeRun.progress = p;
+        pushUpgrades();
+      },
+      onSlotDone: (r) => {
+        upgradeRun.results.push(r);
+        if (r.error) log(`upgrade search ${r.slot}: ${r.error}`);
+        pushUpgrades();
+      },
+    });
+    log(`upgrade search done in ${Date.now() - started} ms`);
+  } catch (err) {
+    if (err instanceof SearchCancelled) upgradeRun.error = overview !== ov ? 'Stopped: a different build was loaded.' : 'Search cancelled.';
+    else if (err instanceof RateLimitError) {
+      const min = Math.ceil(err.waitMs / 60_000);
+      upgradeRun.error = err.fromServer
+        ? `The trade site paused searches for about ${min} min – the search stopped here. Try again later.`
+        : `The trade site's search limit is used up for about ${min} min – the search stopped here so it is not exceeded. Try again later.`;
+      log(`upgrade search: rate limit ${err.fromServer ? 'from the trade site (429)' : 'held back locally'}, ${Math.ceil(err.waitMs / 1000)} s`);
+    }
+    else upgradeRun.error = message(err);
+    log(`upgrade search stopped: ${upgradeRun.error}`);
+  } finally {
+    upgradeRun.running = false;
+    delete upgradeRun.progress;
+    pushUpgrades();
+  }
+  return upgradeRun;
+}
+
 // ---------- Window ----------
 
 function createMainWindow() {
@@ -697,7 +805,7 @@ if (!app.requestSingleInstanceLock()) {
     void startEngine();
     if (process.env.COMPANION_TEST) {
       // Invisible tests drive the item check directly – no global hotkey, never sending keys.
-      (globalThis as Record<string, unknown>).__companionTest = { itemCheck, equipLast };
+      (globalThis as Record<string, unknown>).__companionTest = { itemCheck, equipLast, startUpgradeSearch };
     } else {
       registerHotkey();
     }

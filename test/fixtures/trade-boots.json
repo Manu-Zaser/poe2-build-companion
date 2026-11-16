@@ -1,0 +1,728 @@
+[
+ {
+  "id": "cf88d2858c9380077ce00dfc265951c931e1518ca74f70b60ba0b6d579ad2e29",
+  "listing": {
+   "price": {
+    "type": "~b/o",
+    "amount": 1,
+    "currency": "chaos"
+   },
+   "indexed": "2026-10-16T20:17:19Z"
+  },
+  "item": {
+   "realm": "poe2",
+   "verified": true,
+   "w": 2,
+   "h": 2,
+   "id": "cf88d2858c9380077ce00dfc265951c931e1518ca74f70b60ba0b6d579ad2e29",
+   "name": "Beast Span",
+   "typeLine": "Wanderer Shoes",
+   "baseType": "Wanderer Shoes",
+   "rarity": "Rare",
+   "ilvl": 79,
+   "identified": true,
+   "properties": [
+    {
+     "name": "Boots",
+     "values": [],
+     "displayMode": 0,
+     "type": 109
+    },
+    {
+     "name": "[Evasion|Evasion Rating]",
+     "values": [
+      [
+       "122",
+       0
+      ]
+     ],
+     "displayMode": 0,
+     "type": 17
+    },
+    {
+     "name": "[EnergyShield|Energy Shield]",
+     "values": [
+      [
+       "37",
+       0
+      ]
+     ],
+     "displayMode": 0,
+     "type": 18
+    }
+   ],
+   "requirements": [
+    {
+     "name": "Level",
+     "values": [
+      [
+       "65",
+       0
+      ]
+     ],
+     "displayMode": 0,
+     "type": 62
+    },
+    {
+     "name": "[Dexterity|Dex]",
+     "values": [
+      [
+       "47",
+       0
+      ]
+     ],
+     "displayMode": 1,
+     "type": 64
+    },
+    {
+     "name": "[Intelligence|Int]",
+     "values": [
+      [
+       "47",
+       0
+      ]
+     ],
+     "displayMode": 1,
+     "type": 65
+    }
+   ],
+   "explicitMods": [
+    {
+     "description": "30% increased Movement Speed",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_2250533757",
+     "mods": [
+      {
+       "name": "Cheetah's",
+       "tier": "P2",
+       "level": 65,
+       "magnitudes": [
+        {
+         "min": "30",
+         "max": "30"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+84 to maximum Life",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_3299347043",
+     "mods": [
+      {
+       "name": "Robust",
+       "tier": "P4",
+       "level": 38,
+       "magnitudes": [
+        {
+         "min": "70",
+         "max": "84"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+12 to maximum Mana",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_1050105434",
+     "mods": [
+      {
+       "name": "Beryl",
+       "tier": "P9",
+       "magnitudes": [
+        {
+         "min": "10",
+         "max": "14"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+30 to [Intelligence|Intelligence]",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_328541901",
+     "mods": [
+      {
+       "name": "of the Savant",
+       "tier": "S2",
+       "level": 66,
+       "magnitudes": [
+        {
+         "min": "28",
+         "max": "30"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+36% to [Resistances|Cold Resistance]",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_4220027924",
+     "mods": [
+      {
+       "name": "of the Ice",
+       "tier": "S2",
+       "level": 71,
+       "magnitudes": [
+        {
+         "min": "36",
+         "max": "40"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+18% to [Resistances|Chaos Resistance]",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_2923486259",
+     "mods": [
+      {
+       "name": "of Expulsion",
+       "tier": "S3",
+       "level": 56,
+       "magnitudes": [
+        {
+         "min": "16",
+         "max": "19"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "frameType": 2,
+   "frameTypeId": "Rare"
+  }
+ },
+ {
+  "id": "bebc4d729a7c4aef380175e2fa369fbf4ab04efb54d6c24816f0ab75dccb75df",
+  "listing": {
+   "price": {
+    "type": "~b/o",
+    "amount": 1,
+    "currency": "chaos"
+   },
+   "indexed": "2026-11-16T19:25:54Z"
+  },
+  "item": {
+   "realm": "poe2",
+   "verified": true,
+   "w": 2,
+   "h": 2,
+   "id": "bebc4d729a7c4aef380175e2fa369fbf4ab04efb54d6c24816f0ab75dccb75df",
+   "sockets": [
+    {
+     "group": 0,
+     "type": "rune"
+    }
+   ],
+   "name": "Brimstone Slippers",
+   "typeLine": "Sekhema Sandals",
+   "baseType": "Sekhema Sandals",
+   "rarity": "Rare",
+   "ilvl": 82,
+   "identified": true,
+   "properties": [
+    {
+     "name": "Boots",
+     "values": [],
+     "displayMode": 0,
+     "type": 109
+    },
+    {
+     "name": "[EnergyShield|Energy Shield]",
+     "values": [
+      [
+       "110",
+       1
+      ]
+     ],
+     "displayMode": 0,
+     "type": 18
+    }
+   ],
+   "requirements": [
+    {
+     "name": "Level",
+     "values": [
+      [
+       "80",
+       0
+      ]
+     ],
+     "displayMode": 0,
+     "type": 62
+    },
+    {
+     "name": "[Intelligence|Int]",
+     "values": [
+      [
+       "108",
+       0
+      ]
+     ],
+     "displayMode": 1,
+     "type": 65
+    }
+   ],
+   "runeMods": [
+    {
+     "description": "5% increased Movement Speed",
+     "domain": "rune",
+     "hash": "stat.rune.stat_2250533757"
+    },
+    {
+     "description": "[ShamanOnlyMods|Bonded]: 10% increased [CooldownRecovery|Cooldown Recovery Rate]",
+     "domain": "rune",
+     "hash": "stat.rune.stat_232299587"
+    }
+   ],
+   "explicitMods": [
+    {
+     "description": "30% increased Movement Speed",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_2250533757",
+     "mods": [
+      {
+       "name": "Cheetah's",
+       "tier": "P2",
+       "level": 65,
+       "magnitudes": [
+        {
+         "min": "30",
+         "max": "30"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "33% increased [EnergyShield|Energy Shield]",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_4015621042",
+     "mods": [
+      {
+       "name": "Djinn's",
+       "tier": "P2",
+       "level": 63,
+       "magnitudes": [
+        {
+         "min": "33",
+         "max": "38"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+92 to maximum Life",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_3299347043",
+     "mods": [
+      {
+       "name": "Rotund",
+       "tier": "P3",
+       "level": 46,
+       "magnitudes": [
+        {
+         "min": "85",
+         "max": "99"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+27 to [Intelligence|Intelligence]",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_328541901",
+     "mods": [
+      {
+       "name": "of the Sage",
+       "tier": "S3",
+       "level": 55,
+       "magnitudes": [
+        {
+         "min": "25",
+         "max": "27"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+28% to [Resistances|Cold Resistance]",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_4220027924",
+     "mods": [
+      {
+       "name": "of the Walrus",
+       "tier": "S4",
+       "level": 50,
+       "magnitudes": [
+        {
+         "min": "26",
+         "max": "30"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+24% to [Resistances|Chaos Resistance]",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_2923486259",
+     "mods": [
+      {
+       "name": "of Bameth",
+       "tier": "S1",
+       "level": 81,
+       "magnitudes": [
+        {
+         "min": "24",
+         "max": "27"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+75 to [StunThreshold|Stun Threshold]",
+     "domain": "explicit",
+     "hash": "stat.explicit.stat_915769802",
+     "mods": [
+      {
+       "name": "Djinn's",
+       "tier": "P2",
+       "level": 63,
+       "magnitudes": [
+        {
+         "min": "64",
+         "max": "94"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "frameType": 2,
+   "frameTypeId": "Rare",
+   "socketedItems": [
+    {
+     "realm": "poe2",
+     "verified": true,
+     "w": 1,
+     "h": 1,
+     "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvUnVuZXMvTmV3UnVuZTUiLCJ3IjoxLCJoIjoxLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/242284c497/NewRune5.png",
+     "stackSize": 1,
+     "maxStackSize": 10,
+     "league": "Forbidden Rites",
+     "id": "7ebdd5e4eb6e4c4c79356b025a8bd01b2df1e5ba3a76f8558d05a5b9f2866d4a",
+     "name": "",
+     "typeLine": "Farrul's Rune of the Chase",
+     "baseType": "Farrul's Rune of the Chase",
+     "ilvl": 0,
+     "identified": true,
+     "properties": [
+      {
+       "name": "Stack Size",
+       "values": [
+        [
+         "1/10",
+         0
+        ]
+       ],
+       "displayMode": 0,
+       "type": 32
+      },
+      {
+       "name": "[Rune|Rune]",
+       "values": [],
+       "displayMode": 0
+      },
+      {
+       "name": "Limited to",
+       "values": [
+        [
+         "1",
+         0
+        ]
+       ],
+       "displayMode": 0
+      }
+     ],
+     "requirements": [
+      {
+       "name": "Level",
+       "values": [
+        [
+         "50",
+         0
+        ]
+       ],
+       "displayMode": 0,
+       "type": 62
+      }
+     ],
+     "explicitMods": [
+      {
+       "description": "Boots: 5% increased Movement Speed"
+      }
+     ],
+     "bondedMods": [
+      "[ShamanOnlyMods|Bonded]:",
+      "Boots: 10% increased [CooldownRecovery|Cooldown Recovery Rate]"
+     ],
+     "descrText": "Place into an empty [Augment] Socket in a pair of Boots to apply its effect to that item. Once socketed it cannot be retrieved but can be replaced by other [Augment] items.",
+     "frameType": 5,
+     "frameTypeId": "Currency",
+     "socket": 0,
+     "socketedIcon": "https://web.poecdn.com/gen/image/WzIxLDE0LHsiayI6IjJEQXJ0L1VJSW1hZ2VzL0luR2FtZS9SdW5lU29ja2V0RmlsbGVkU3BlY2lhbCIsInJlYWxtIjoicG9lMiJ9XQ/4576081b73/RuneSocketFilledSpecial.png"
+    }
+   ]
+  }
+ },
+ {
+  "id": "447980722a1e21156b320908a5a60149f7514ee335fa9a41b748722ab880f6fd",
+  "listing": {
+   "price": {
+    "type": "~b/o",
+    "amount": 1,
+    "currency": "chaos"
+   },
+   "indexed": "2026-11-11T14:07:29Z"
+  },
+  "item": {
+   "realm": "poe2",
+   "verified": true,
+   "w": 2,
+   "h": 2,
+   "id": "447980722a1e21156b320908a5a60149f7514ee335fa9a41b748722ab880f6fd",
+   "sockets": [
+    {
+     "group": 0,
+     "type": "rune"
+    }
+   ],
+   "name": "Maelström Span",
+   "typeLine": "Sekhema Sandals",
+   "baseType": "Sekhema Sandals",
+   "rarity": "Rare",
+   "ilvl": 81,
+   "identified": true,
+   "corrupted": true,
+   "properties": [
+    {
+     "name": "Boots",
+     "values": [],
+     "displayMode": 0,
+     "type": 109
+    },
+    {
+     "name": "[Quality]",
+     "values": [
+      [
+       "+20%",
+       1
+      ]
+     ],
+     "displayMode": 0,
+     "type": 6
+    },
+    {
+     "name": "[EnergyShield|Energy Shield]",
+     "values": [
+      [
+       "133",
+       1
+      ]
+     ],
+     "displayMode": 0,
+     "type": 18
+    }
+   ],
+   "requirements": [
+    {
+     "name": "Level",
+     "values": [
+      [
+       "80",
+       0
+      ]
+     ],
+     "displayMode": 0,
+     "type": 62
+    },
+    {
+     "name": "[Intelligence|Int]",
+     "values": [
+      [
+       "108",
+       0
+      ]
+     ],
+     "displayMode": 1,
+     "type": 65
+    }
+   ],
+   "explicitMods": [
+    {
+     "description": "30% increased Movement Speed",
+     "flags": {
+      "desecrated": true
+     },
+     "domain": "desecrated",
+     "hash": "stat.desecrated.stat_2250533757",
+     "mods": [
+      {
+       "name": "Cheetah's",
+       "tier": "P2",
+       "level": 65,
+       "magnitudes": [
+        {
+         "min": "30",
+         "max": "30"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "34% increased [EnergyShield|Energy Shield]",
+     "flags": {
+      "desecrated": true
+     },
+     "domain": "desecrated",
+     "hash": "stat.desecrated.stat_4015621042",
+     "mods": [
+      {
+       "name": "Djinn's",
+       "tier": "P2",
+       "level": 63,
+       "magnitudes": [
+        {
+         "min": "33",
+         "max": "38"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+101 to maximum Life",
+     "flags": {
+      "desecrated": true
+     },
+     "domain": "desecrated",
+     "hash": "stat.desecrated.stat_3299347043",
+     "mods": [
+      {
+       "name": "Virile",
+       "tier": "P2",
+       "level": 54,
+       "magnitudes": [
+        {
+         "min": "100",
+         "max": "119"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+30% to [Resistances|Fire Resistance]",
+     "flags": {
+      "desecrated": true
+     },
+     "domain": "desecrated",
+     "hash": "stat.desecrated.stat_3372524247",
+     "mods": [
+      {
+       "name": "of the Furnace",
+       "tier": "S4",
+       "level": 48,
+       "magnitudes": [
+        {
+         "min": "26",
+         "max": "30"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+31% to [Resistances|Cold Resistance]",
+     "flags": {
+      "desecrated": true
+     },
+     "domain": "desecrated",
+     "hash": "stat.desecrated.stat_4220027924",
+     "mods": [
+      {
+       "name": "of the Polar Bear",
+       "tier": "S3",
+       "level": 60,
+       "magnitudes": [
+        {
+         "min": "31",
+         "max": "35"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+17% to [Resistances|Chaos Resistance]",
+     "flags": {
+      "desecrated": true
+     },
+     "domain": "desecrated",
+     "hash": "stat.desecrated.stat_2923486259",
+     "mods": [
+      {
+       "name": "of Expulsion",
+       "tier": "S3",
+       "level": 56,
+       "magnitudes": [
+        {
+         "min": "16",
+         "max": "19"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "description": "+71 to [StunThreshold|Stun Threshold]",
+     "flags": {
+      "desecrated": true
+     },
+     "domain": "desecrated",
+     "hash": "stat.desecrated.stat_915769802",
+     "mods": [
+      {
+       "name": "Djinn's",
+       "tier": "P2",
+       "level": 63,
+       "magnitudes": [
+        {
+         "min": "64",
+         "max": "94"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "desecrated": true,
+   "frameType": 2,
+   "frameTypeId": "Rare",
+   "socketedItems": []
+  }
+ }
+]

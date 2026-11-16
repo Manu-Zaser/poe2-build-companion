@@ -228,3 +228,71 @@ export type OverlayContent =
       targetName?: string;
     }
   | { kind: 'error'; message: string };
+
+// ---------- Upgrade search ----------
+
+/** What the user asks for on the Upgrades page. */
+export interface UpgradeRequest {
+  /** Budget per item. */
+  budget: number;
+  currency: 'divine' | 'exalted';
+  slots: string[];
+  /** Share of DPS in the weighting (0…1); the rest goes to effective HP. */
+  dpsWeight: number;
+  /** Only listings with instant buyout. */
+  instantOnly: boolean;
+}
+
+export interface UpgradeCandidate {
+  item: ItemInfo;
+  /** Listing price as the seller set it, e.g. { amount: 2, currency: 'divine' }. */
+  price: { amount: number; currency: string } | null;
+  priceDivine: number | null;
+  dpsPct: number;
+  ehpPct: number;
+  /** Weighted gain in %. */
+  gain: number;
+  upgrade: boolean;
+  /** Why the item is ruled out (resistance below cap, attributes, spirit, movement speed). */
+  blocking: string[];
+  warnings: string[];
+  changes: import('./verdict').Change[];
+  /** When the listing was put up (ISO). */
+  listedAt?: string;
+}
+
+export interface UpgradeSlotResult {
+  slot: string;
+  /** What the build wears there now. */
+  current: string | null;
+  /** Matching listings on the trade site. */
+  total: number;
+  /** How many of them Path of Building calculated. */
+  evaluated: number;
+  /** The search on the trade site (to buy by hand). */
+  tradeUrl?: string;
+  /** Best first; at most a handful. */
+  candidates: UpgradeCandidate[];
+  error?: string;
+}
+
+export interface UpgradeProgress {
+  slot: string;
+  /** 0-based index of the slot and number of slots. */
+  index: number;
+  count: number;
+  step: 'weights' | 'search' | 'fetch' | 'evaluate' | 'wait';
+  /** Seconds left while waiting for the trade site's rate limit. */
+  waitS?: number;
+}
+
+export interface UpgradeRun {
+  running: boolean;
+  league?: string;
+  /** Exalted per Divine used for prices. */
+  exaltedPerDivine?: number;
+  budgetExalted?: number;
+  progress?: UpgradeProgress;
+  results: UpgradeSlotResult[];
+  error?: string;
+}

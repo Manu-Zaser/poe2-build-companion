@@ -9,6 +9,27 @@ Status: **Phase 3 (target build) – done.** Phases 0–3 of the concept are com
 > Uses [Path of Building PoE2](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2) (MIT, © David Gowor)
 > as its calculation engine, unchanged, as a git submodule.
 
+## Upgrades
+
+On the *Upgrades* page, set a budget per item (Divine or Exalted), how much damage vs. defence counts, and the slots
+to search. One click on **Find upgrades** then, per slot:
+
+1. Path of Building weighs every mod that can roll on the slot by what it adds to your build (its own trade
+   search generator).
+2. The trade site is searched **anonymously** – no login, no POESESSID, never PoB's OAuth token. A weighted search
+   is too complex without login, so the most valuable mods become a "count" search (at least 4 of the top 8 with
+   PoB's middle roll, looser if that finds too little), priced up to the budget. Boots keep at least your current
+   movement speed.
+3. 30 listings (the cheapest ones plus a spread up to the budget) are calculated one by one in your build, exactly
+   like the item check.
+4. The page lists the best per slot with price, DPS, effective HP and overall gain. Items that newly drop a
+   resistance below the cap, miss an attribute requirement, overdraw spirit or lose movement speed are never shown
+   as upgrades.
+
+Buying stays with you: each slot links its search on the trade site. The search waits for the trade site's rate
+limits and stops (keeping what it found) if a limit would be exceeded. Prices are converted with poe.ninja's
+exchange rates.
+
 ## Target build (phase 3)
 
 On the *Target build* page, set the build you follow – paste its Path of Building code (e.g. from a guide) or use a
@@ -100,6 +121,7 @@ npx electron scripts/run-hidden.cjs scripts/ui-check.cjs <output folder>     # c
 npx electron scripts/run-hidden.cjs scripts/check-ui.cjs <output folder>     # item check and overlay
 npx electron scripts/run-hidden.cjs scripts/target-ui.cjs <output folder>    # target build and fit checklist
 npx electron scripts/run-hidden.cjs scripts/file-ui.cjs <output folder>      # PoB file source (own test folder)
+npx electron scripts/run-hidden.cjs scripts/upgrades-ui.cjs <output folder>  # upgrade search (LIVE trade site, 2 slots)
 ```
 
 The tests never register the global hotkey and never send keys; the item check is called with fixture texts.
@@ -110,14 +132,17 @@ The tests never register the global hotkey and never send keys; the item check i
 vendor/PathOfBuilding-PoE2   PoB PoE2, unchanged (git submodule)
 src/engine/host.ts           Engine process: loads PoB's own LuaJIT (runtime/lua51.dll) via koffi; JSON lines on
                              stdin/stdout. Started by the app as Electron in Node mode – no extra runtime.
-src/engine/bridge.lua        Lua side: boots PoB headless; commands "load", "overview", "compare", "equip"
+src/engine/bridge.lua        Lua side: boots PoB headless; commands "load", "overview", "compare", "equip",
+                             "upgradeQuery" (PoB's mod weights for a slot), "evaluate" (many items in one slot)
 src/main/                    Electron main process: window, storage, engine client, poe.ninja refresh, PoB build
                              files (pobfile.ts: find, list, read, watch), hotkey, overlay window
+src/main/upgradesearch.ts    Upgrade search flow (PoB weights → trade search → fetch → PoB → ranking)
 src/shared/                  Build code decoding, poe.ninja lookup, verdict and warnings, target build and fit
-                             (targets.ts), types
+                             (targets.ts), trade listing → PoB item text (tradeitem.ts), upgrade search query and
+                             ranking (upgrades.ts), types
 src/renderer/                Character, build source and item check pages; overlay
 ../core (@poe2/core)         Shared with Price Check: hotkey helpers, one copy keystroke (Ctrl+Alt+C) and window
-                             focus, reading the item text, log file
+                             focus, reading the item text, log file, trade client, poe.ninja exchange rates
 ```
 
 Settings and the last build are stored in `%APPDATA%\PoE2 Build Companion\companion.json`; the log file

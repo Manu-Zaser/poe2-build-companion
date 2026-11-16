@@ -89,6 +89,33 @@ export function hardWarnings(before: Stats, after: Stats): string[] {
   return out;
 }
 
+/**
+ * Only problems an item would NEWLY cause – used by the upgrade search to rule candidates out:
+ * a capped resistance falls below the cap, an attribute requirement is no longer met, spirit no longer
+ * covers reservations, movement speed drops. (A resistance that is already below the cap and drops
+ * further is shown as a warning but not ruled out – PoB's effective HP already accounts for it.)
+ */
+export function blockingWarnings(before: Stats, after: Stats): string[] {
+  const out: string[] = [];
+  for (const e of ELEMENTS) {
+    const mb = v(before, `Missing${e}Resist`);
+    const ma = v(after, `Missing${e}Resist`);
+    if (mb === 0 && ma > 0) out.push(`${e} resistance falls below the cap (${v(after, `${e}Resist`)}% of ${v(after, `${e}Resist`) + ma}%)`);
+  }
+  for (const [k, name] of ATTRS) {
+    const missBefore = Math.max(0, v(before, `Req${k}`) - v(before, k));
+    const missAfter = Math.max(0, v(after, `Req${k}`) - v(after, k));
+    if (missAfter > missBefore) out.push(`Not enough ${name}: ${v(after, k)} of ${v(after, `Req${k}`)} needed`);
+  }
+  const sb = v(before, 'SpiritUnreserved');
+  const sa = v(after, 'SpiritUnreserved');
+  if (sa < 0 && sa < sb) out.push(`Spirit no longer covers your reservations (${sa} free)`);
+  const msb = v(before, 'EffectiveMovementSpeedMod');
+  const msa = v(after, 'EffectiveMovementSpeedMod');
+  if (msb > 0 && msa < msb - 0.005) out.push(`Movement speed drops (${Math.round((msb - 1) * 100)}% → ${Math.round((msa - 1) * 100)}%)`);
+  return out;
+}
+
 export function judgeSlot(before: Stats, cmp: SlotComparison): SlotVerdict {
   const after = cmp.after;
   const dpsPct = pct(v(after, 'CombinedDPS'), v(before, 'CombinedDPS'));

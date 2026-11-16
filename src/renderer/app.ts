@@ -1,5 +1,6 @@
 import type { Api } from '../main/preload';
-import type { BuildView, GearSlot, ItemIcon, ItemInfo, Overview, PobFileEntry, SkillDps, Stats } from '../shared/types';
+import type { BuildView, GearSlot, ItemIcon, ItemInfo, Overview, PobFileEntry, SkillDps, Stats, UpgradeCandidate, UpgradeRun, UpgradeSlotResult } from '../shared/types';
+import { UPGRADE_SLOTS } from '../shared/upgrades';
 import { fitAgainst } from '../shared/targets';
 import { acceleratorFromEvent, formatHotkey, validateHotkey } from '@poe2/core/hotkey';
 import { ageText, compact, fmt, isStale, short } from './format';
@@ -490,6 +491,7 @@ function render(v: BuildView) {
   $('empty').hidden = !!v.build || v.engine === 'starting';
   $('char').hidden = !ov;
 
+  renderUpgradeSlots(v);
   if (ov) {
     renderHeader(v, ov);
     renderEquipment(ov, v.build?.icons ?? []);
@@ -693,6 +695,200 @@ $('ninja-save').addEventListener('click', () => void connect());
 linkInput.addEventListener('keydown', (e) => e.key === 'Enter' && void connect());
 $('ninja-clear').addEventListener('click', () => void api.clearNinja().then((r) => render(r.view)));
 $('ninja-open').addEventListener('click', () => void api.openNinja());
+
+// ---------- Upgrades page ----------
+
+const UP_FORM_KEY = 'upgrades-form';
+interface UpForm { budget: number; currency: 'divine' | 'exalted'; dpsWeight: number; instantOnly: boolean; slots?: string[] }
+let upForm: UpForm = { budget: 2, currency: 'divine', dpsWeight: 0.5, instantOnly: true };
+try {
+  const saved = JSON.parse(localStorage.getItem(UP_FORM_KEY) ?? 'null') as Partial<UpForm> | null;
+  if (saved) upForm = { ...upForm, ...saved };
+} catch {
+  // nur eine Bequemlichkeit
+}
+const saveUpForm = () => {
+  try {
+    localStorage.setItem(UP_FORM_KEY, JSON.stringify(upForm));
+  } catch {
+    // egal
+  }
+};
+let upRun: UpgradeRun = { running: false, results: [] };
+
+/** Default: slots with a rare/magic item or empty – uniques are often what the build is made of. */
+function defaultSlots(ov: Overview): string[] {
+  return UPGRADE_SLOTS.filter((s) => {
+    const g = ov.gear.find((x) => x.slot === s);
+    return !g?.item || (g.item.rarity !== 'UNIQUE' && g.item.rarity !== 'RELIC');
+  });
+}
+
+function renderUpgradeSlots(v: BuildView) {
+  const ov = v.overview;
+  const box = $('up-slots');
+  box.replaceChildren();
+  if (!ov) {
+    box.append(el('p', 'up-none', 'Load your build first.'));
+    updateUpNote();
+    return;
+  }
+  const chosen = new Set(upForm.slots ?? defaultSlots(ov));
+  for (const slot of UPGRADE_SLOTS) {
+    const item = ov.gear.find((g) => g.slot === slot)?.item ?? null;
+    const b = el('button', `up-slot${chosen.has(slot) ? ' on' : ''}`, el('span', 's1', slot), el('span', 's2', item ? (item.title ?? item.name) : 'empty'));
+    b.addEventListener('click', () => {
+      const now = new Set(upForm.slots ?? defaultSlots(ov));
+      if (now.has(slot)) now.delete(slot);
+      else now.add(slot);
+      upForm.slots = UPGRADE_SLOTS.filter((s) => now.has(s));
+      saveUpForm();
+      renderUpgradeSlots(v);
+    });
+    box.append(b);
+  }
+  updateUpNote();
+}
+
+function chosenSlots(): string[] {
+  const ov = current?.overview;
+  return ov ? (upForm.slots ?? defaultSlots(ov)) : [];
+}
+
+function updateUpNote() {
+  const n = chosenSlots().length;
+  $('up-note').textContent = n ? `${n} slot${n === 1 ? '' : 's'} · up to ${n * 2} trade searches` : '';
+}
+
+const signed = (n: number) => `${n > 0 ? '+' : ''}${n.toFixed(1)}%`;
+const tone = (n: number) => (n >= 0.5 ? 'pos' : n <= -0.5 ? 'neg' : 'zero');
+const CUR_SHORT: Record<string, string> = { divine: 'div', exalted: 'ex', chaos: 'chaos' };
+
+function candidateRow(c: UpgradeCandidate): HTMLElement {
+  const name = el('span', `name rarity-${c.item.rarity.toLowerCase()}`, c.item.title && c.item.title !== c.item.base ? `${c.item.title}, ${c.item.base}` : c.item.base);
+  attachTooltip(name, c.item);
+  const price = c.price ? `${fmt(c.price.amount)} ${CUR_SHORT[c.price.currency] ?? c.price.currency}` : '–';
+  const row = el(
+    'div',
+    `up-cand ${c.upgrade ? 'good' : 'meh'}`,
+    name,
+    el('span', 'price', price),
+    el('span', `num ${tone(c.dpsPct)}`, signed(c.dpsPct)),
+    el('span', `num ${tone(c.ehpPct)}`, signed(c.ehpPct)),
+    el('span', `gain ${tone(c.gain)}`, signed(c.gain)),
+  );
+  if (c.blocking.length) row.append(el('span', 'why', c.blocking.join(' · ')));
+  else if (c.warnings.length) row.append(el('span', 'why soft', c.warnings.join(' · ')));
+  return row;
+}
+
+function slotResult(r: UpgradeSlotResult): HTMLElement {
+  const head = el('div', 'up-slot-head', el('h3', '', r.slot, el('span', 'wears', r.current ? `wears ${r.current}` : 'empty')));
+  const meta = el('div', 'up-meta');
+  if (!r.error) meta.append(`${fmt(r.total)} listing${r.total === 1 ? '' : 's'} · ${r.evaluated} calculated`);
+  if (r.tradeUrl) {
+    const a = el('a', '', 'Open on trade site');
+    a.href = r.tradeUrl;
+    a.target = '_blank';
+    a.rel = 'noreferrer';
+    meta.append(a);
+  }
+  head.append(meta);
+  const card = el('section', 'card up-slot-card', head);
+  if (r.error) {
+    card.append(el('p', 'up-error', r.error));
+    return card;
+  }
+  if (r.candidates.length === 0) {
+    card.append(el('p', 'up-none', r.total ? 'None of the listings could be calculated.' : 'Nothing within the budget has enough of the mods your build needs.'));
+    return card;
+  }
+  if (!r.candidates.some((c) => c.upgrade)) {
+    card.append(el('p', 'up-none', `No upgrade among the ${r.evaluated} listings calculated (cheapest and spread up to the budget) – the closest:`));
+  }
+  card.append(
+    el('div', 'up-head-row', el('span', '', 'Item'), el('span', '', 'Price'), el('span', '', 'DPS'), el('span', '', 'eHP'), el('span', '', 'Overall')),
+    el('div', 'up-list', ...r.candidates.map(candidateRow)),
+  );
+  return card;
+}
+
+const STEP_TEXT = {
+  weights: 'Path of Building weighs the mods',
+  search: 'searching the trade site',
+  fetch: 'loading listings',
+  evaluate: 'calculating in your build',
+  wait: 'waiting for the trade site',
+} as const;
+
+function renderUpgrades(r: UpgradeRun) {
+  upRun = r;
+  $<HTMLButtonElement>('up-start').disabled = r.running;
+  $('up-cancel').hidden = !r.running;
+  const p = r.progress;
+  let text = '';
+  if (r.running) {
+    text = p ? `${p.slot} (${p.index + 1}/${p.count}): ${STEP_TEXT[p.step]}${p.step === 'wait' && p.waitS ? ` – ${p.waitS} s` : ''}…` : 'Starting…';
+  } else if (r.league && !r.error) {
+    const found = r.results.reduce((n, x) => n + x.candidates.filter((c) => c.upgrade).length, 0);
+    text = `Done – ${found} upgrade${found === 1 ? '' : 's'} found.`;
+  }
+  if (r.league && r.budgetExalted) text += `  ${r.league} · budget ${fmt(r.budgetExalted)} ex${r.exaltedPerDivine ? ` (1 div = ${fmt(r.exaltedPerDivine)} ex)` : ''}`;
+  $('up-progress').textContent = text;
+  if (r.error && !r.running) message(r.error, 'error');
+  // Slots mit Upgrade zuerst, sonst in Suchreihenfolge.
+  const sorted = [...r.results].sort((a, b) => Number(b.candidates.some((c) => c.upgrade)) - Number(a.candidates.some((c) => c.upgrade)));
+  $('up-results').replaceChildren(...sorted.map(slotResult));
+}
+
+function syncUpForm() {
+  $<HTMLInputElement>('up-budget').value = String(upForm.budget);
+  for (const b of document.querySelectorAll<HTMLButtonElement>('#up-currency button')) b.classList.toggle('active', b.dataset.cur === upForm.currency);
+  const d = Math.round(upForm.dpsWeight * 100);
+  $<HTMLInputElement>('up-weight').value = String(d);
+  $('up-weight-text').textContent = `${d}% damage · ${100 - d}% defence`;
+  $<HTMLInputElement>('up-instant').checked = upForm.instantOnly;
+}
+syncUpForm();
+
+$('up-budget').addEventListener('input', (e) => {
+  const n = Number((e.target as HTMLInputElement).value);
+  if (Number.isFinite(n) && n > 0) {
+    upForm.budget = n;
+    saveUpForm();
+  }
+});
+for (const b of document.querySelectorAll<HTMLButtonElement>('#up-currency button')) {
+  b.addEventListener('click', () => {
+    upForm.currency = b.dataset.cur === 'exalted' ? 'exalted' : 'divine';
+    saveUpForm();
+    syncUpForm();
+  });
+}
+$('up-weight').addEventListener('input', (e) => {
+  upForm.dpsWeight = Number((e.target as HTMLInputElement).value) / 100;
+  saveUpForm();
+  syncUpForm();
+});
+$('up-instant').addEventListener('change', (e) => {
+  upForm.instantOnly = (e.target as HTMLInputElement).checked;
+  saveUpForm();
+});
+$('up-start').addEventListener('click', () => {
+  if (!current?.overview || upRun.running) return;
+  const budget = Number($<HTMLInputElement>('up-budget').value);
+  if (!(budget > 0)) {
+    message('Enter a budget per item.', 'error');
+    return;
+  }
+  message('');
+  void api
+    .startUpgrades({ budget, currency: upForm.currency, slots: chosenSlots(), dpsWeight: upForm.dpsWeight, instantOnly: upForm.instantOnly })
+    .then(renderUpgrades);
+});
+$('up-cancel').addEventListener('click', () => api.cancelUpgrades());
+api.onUpgrades(renderUpgrades);
+void api.getUpgrades().then(renderUpgrades);
 
 api.onView(render);
 void api.getView().then(render);

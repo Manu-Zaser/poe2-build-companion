@@ -38,6 +38,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="11" rx="2" /><path d="M7 11h2M11 11h2M15 11h2M8 14.5h8" /></svg>
         <span>Item check</span>
       </button>
+      <button class="nav-item" data-page="upgrades">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" /><path d="M5 20h14" /></svg>
+        <span>Upgrades</span>
+      </button>
     </nav>
 
     <div class="sidebar-foot">
@@ -238,6 +242,45 @@
           </ol>
           <p class="section-hint">The overlay stays open until you close it (× or Esc). Drag it anywhere – it remembers the position. <button class="link-btn" id="overlay-reset">Reset position</button></p>
         </div>
+      </section>
+      <!-- UPGRADES -->
+      <section class="page" data-page="upgrades" data-title="Upgrades" data-sub="Items on the trade site that beat your gear, within a budget per item">
+        <div class="card pad">
+          <div class="card-head"><h2>Search</h2><span class="card-note" id="up-note"></span></div>
+          <div class="up-form">
+            <label class="up-field">
+              <span class="up-label">Budget per item</span>
+              <span class="up-budget">
+                <input type="number" id="up-budget" min="0" step="any" value="2" />
+                <span class="set-toggle" id="up-currency" role="group" aria-label="Currency">
+                  <button data-cur="divine" class="active">Divine</button><button data-cur="exalted">Exalted</button>
+                </span>
+              </span>
+            </label>
+            <label class="up-field">
+              <span class="up-label">Weighting <b id="up-weight-text"></b></span>
+              <input type="range" id="up-weight" min="0" max="100" step="10" value="50" />
+              <span class="up-scale"><span>Defence</span><span>Damage</span></span>
+            </label>
+            <label class="up-check"><input type="checkbox" id="up-instant" checked /> Instant buyout only</label>
+          </div>
+          <div class="up-label">Slots</div>
+          <div class="up-slots" id="up-slots"></div>
+          <div class="row up-actions">
+            <button class="btn primary" id="up-start">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+              <span>Find upgrades</span>
+            </button>
+            <button class="btn ghost" id="up-cancel" hidden>Cancel</button>
+            <span class="up-progress" id="up-progress"></span>
+          </div>
+          <p class="section-hint">
+            Path of Building picks the mods worth most to your build, the trade site is searched anonymously (no login)
+            and every listing found is calculated in your build. Only on click; buying stays with you – open the search
+            on the trade site and contact the seller there.
+          </p>
+        </div>
+        <div id="up-results" class="up-results"></div>
       </section>
     </main>
   </div>
