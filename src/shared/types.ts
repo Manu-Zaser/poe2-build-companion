@@ -259,6 +259,8 @@ export interface UpgradeCandidate {
   changes: import('./verdict').Change[];
   /** When the listing was put up (ISO). */
   listedAt?: string;
+  /** The trade site with this listing on top (same search, this seller). */
+  tradeUrl?: string;
 }
 
 export interface UpgradeSlotResult {

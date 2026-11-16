@@ -8,6 +8,7 @@ import {
   anonymousUpgradeQuery,
   ENOUGH_RESULTS,
   MOVEMENT_SPEED_STAT,
+  listingUrl,
   movementSpeedOf,
   pickCandidates,
   rankCandidates,
@@ -106,6 +107,18 @@ describe('anonymous upgrade search', () => {
     expect(pickCandidates(ids.slice(0, 7))).toEqual(ids.slice(0, 7));
   });
 
+  it('links one listing: same search, limited to the seller and base type', () => {
+    const q = anonymousUpgradeQuery(pobQuery, mods, { maxExalted: 500 });
+    const url = listingUrl('Forbidden Rites', q, 'Seller#1234', 'Wanderer Shoes');
+    expect(url.startsWith('https://www.pathofexile.com/trade2/search/poe2/Forbidden%20Rites?q=')).toBe(true);
+    const back = JSON.parse(decodeURIComponent(url.split('?q=')[1])) as TradeQuery;
+    expect(back.query.type).toBe('Wanderer Shoes');
+    expect(back.query.filters?.trade_filters).toEqual({ filters: { price: { max: 500 } , account: { input: 'Seller#1234' } } });
+    expect(back.query.stats).toEqual(q.query.stats);
+    // The original query stays untouched.
+    expect(q.query.type).toBeUndefined();
+  });
+
   it('links the search on the trade site', () => {
     expect(tradeSearchUrl('Forbidden Rites', 'Ab12Cd')).toBe('https://www.pathofexile.com/trade2/search/poe2/Forbidden%20Rites/Ab12Cd');
   });
@@ -190,7 +203,8 @@ function fakes(total: number[]) {
         const t = total[n++] ?? 0;
         return { id: `q${n}`, total: t, result: listings.slice(0, Math.min(t, 3)).map((l) => l.id) };
       },
-      fetchListings: async (_id, ids) => listings.filter((l) => ids.includes(l.id)),
+      fetchListings: async (_id, ids) =>
+        listings.filter((l) => ids.includes(l.id)).map((l) => ({ ...l, listing: { ...l.listing, account: { name: 'Seller#1' } } })),
     },
   };
   return { deps, calls, searches };
@@ -207,6 +221,7 @@ describe('upgrade search flow', () => {
     expect(r.candidates[0].item.name).toBe('Candidate 1');
     expect(r.candidates[0].upgrade).toBe(true);
     expect(r.candidates[0].ehpPct).toBeCloseTo(6);
+    expect(r.candidates[0].tradeUrl).toContain(encodeURIComponent('"account":{"input":"Seller#1"}'));
     expect(r.candidates[0].price).toEqual({ amount: listings[1].listing.price!.amount, currency: listings[1].listing.price!.currency });
     // Boots must keep the current movement speed; the budget is the Exalted equivalent.
     const q = searches[0] as TradeQuery;

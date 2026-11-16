@@ -779,6 +779,17 @@ function candidateRow(c: UpgradeCandidate): HTMLElement {
   );
   if (c.blocking.length) row.append(el('span', 'why', c.blocking.join(' · ')));
   else if (c.warnings.length) row.append(el('span', 'why soft', c.warnings.join(' · ')));
+  if (c.tradeUrl) {
+    // Ganze Zeile klickbar: öffnet die Trade-Seite (im Browser) mit genau diesem Angebot oben.
+    const url = c.tradeUrl;
+    row.classList.add('clickable');
+    row.title = 'Open this listing on the trade site';
+    row.tabIndex = 0;
+    const open = () => window.open(url, '_blank');
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open()));
+    row.append(el('span', 'open', '↗'));
+  }
   return row;
 }
 

@@ -13,6 +13,7 @@ import {
   anonymousUpgradeQuery,
   ENOUGH_RESULTS,
   MOVEMENT_SPEED_STAT,
+  listingUrl,
   movementSpeedOf,
   pickCandidates,
   QUERY_STEPS,
@@ -103,10 +104,12 @@ export async function searchSlot(
   const maxExalted = budgetInExalted(deps.rates, req.budget, req.currency);
 
   let found: SearchResponse | null = null;
+  let used: TradeQuery | null = null;
   for (const s of QUERY_STEPS) {
     const query = anonymousUpgradeQuery(pob.query, pob.mods, { maxExalted, minCount: s.minCount, rollShare: s.rollShare, required });
     deps.onProgress?.(step('search'));
     found = await rateLimited(() => deps.trade.search(deps.league, query), deps, step('search'));
+    used = query;
     check();
     if (found.total >= ENOUGH_RESULTS) break;
   }
@@ -158,6 +161,7 @@ export async function searchSlot(
         warnings: verdict.warnings.filter((w) => !s.blocking.includes(w)),
         changes: verdict.changes,
         ...(l.listing.indexed ? { listedAt: l.listing.indexed } : {}),
+        ...(used && l.listing.account?.name ? { tradeUrl: listingUrl(deps.league, used, l.listing.account.name, typeof l.item.baseType === 'string' ? l.item.baseType : undefined) } : {}),
       },
     });
   }

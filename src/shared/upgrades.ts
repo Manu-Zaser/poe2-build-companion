@@ -92,6 +92,18 @@ export function pickCandidates(ids: string[], count = CANDIDATES_PER_SLOT, cheap
 /** Slots the upgrade search covers (the equipment slots PoB's trade search supports). */
 export const UPGRADE_SLOTS = ['Weapon 1', 'Weapon 2', 'Helmet', 'Body Armour', 'Gloves', 'Boots', 'Amulet', 'Ring 1', 'Ring 2', 'Belt'] as const;
 
+/**
+ * The trade site's page with one listing on top: the same search, limited to the seller and the item's base type.
+ * The page runs the search itself from ?q=… – that costs no request from this app.
+ */
+export function listingUrl(league: string, query: TradeQuery, seller: string, baseType?: string): string {
+  const q = structuredClone(query);
+  if (baseType) q.query.type = baseType;
+  const trade = q.query.filters?.trade_filters?.filters ?? {};
+  q.query.filters = { ...q.query.filters, trade_filters: { filters: { ...trade, account: { input: seller } } } };
+  return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(q))}`;
+}
+
 /** The trade site's page for a search, to look at and buy by hand. */
 export function tradeSearchUrl(league: string, queryId: string): string {
   return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}/${encodeURIComponent(queryId)}`;
