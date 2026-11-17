@@ -19,7 +19,7 @@ import {
   type PobModWeight,
   type TradeQuery,
 } from '../src/shared/upgrades';
-import { defenceFilters, searchStats, type SearchStat } from '../src/shared/searchstats';
+import { currentValueOf, defenceFilters, searchStats, withWornMinimums, type SearchStat } from '../src/shared/searchstats';
 import { blockingWarnings, judgeSlot } from '../src/shared/verdict';
 import { runUpgradeSearch, searchSlot, SearchCancelled, type UpgradeDeps } from '../src/main/upgradesearch';
 import type { ItemInfo, Stats, UpgradeRequest } from '../src/shared/types';
@@ -70,9 +70,9 @@ const mods: PobModWeight[] = [
   { id: 'explicit.stat_useless', text: '#% increased Light Radius', weight: 0, effect: 0, testedValue: 10 },
 ];
 const stats: SearchStat[] = [
-  { id: 'pseudo.pseudo_total_life', label: 'Life', effect: 160, value: 80 },
-  { id: 'pseudo.pseudo_total_cold_resistance', label: 'Cold resistance', effect: 60, value: 30 },
-  { id: 'explicit.stat_small', label: 'Small', effect: 50, value: 0.6 },
+  { id: 'pseudo.pseudo_total_life', label: 'Life', effect: 160, value: 80, match: 'total:life' },
+  { id: 'pseudo.pseudo_total_cold_resistance', label: 'Cold resistance', effect: 60, value: 30, match: 'res:cold', atLeast: 25 },
+  { id: 'explicit.stat_small', label: 'Small', effect: 50, value: 0.6, match: '#% increased Stun Threshold' },
 ];
 
 describe('anonymous upgrade search', () => {
@@ -96,7 +96,8 @@ describe('anonymous upgrade search', () => {
     // Tiny rolls have no minimum.
     expect(count.filters).toEqual([
       { id: 'pseudo.pseudo_total_life', value: { min: 56 } },
-      { id: 'pseudo.pseudo_total_cold_resistance', value: { min: 21 } },
+      // The worn item's value wins over the looser roll minimum.
+      { id: 'pseudo.pseudo_total_cold_resistance', value: { min: 25 } },
       { id: 'explicit.stat_small' },
     ]);
     expect(and).toEqual({ type: 'and', filters: [{ id: MOVEMENT_SPEED_STAT, value: { min: 30 } }] });
@@ -229,6 +230,44 @@ describe('which stats the search looks for', () => {
     ];
     const s = searchStats(body, { slot: 'Body Armour', defences: { armour: false, evasion: true, energyShield: false } });
     expect(s.map((x) => x.id)).toEqual(['implicit.stat_ward', 'pseudo.pseudo_total_lightning_resistance', 'explicit.stat_mom']);
+  });
+});
+
+describe('at least what you wear', () => {
+  const worn = [
+    '+12% to all Elemental Resistances',
+    '+26% to Cold Resistance',
+    '+15% to Cold and Chaos Resistances',
+    '+84 to maximum Life',
+    '+10 to Strength and Dexterity',
+    '+20 to Strength',
+    'Adds 10 to 20 Fire Damage to Attacks',
+    '18% increased Attack Speed',
+    '+120 to Evasion Rating (Local)',
+  ];
+
+  it('reads the worn values of pseudo totals and plain mods', () => {
+    expect(currentValueOf({ match: 'res:cold' }, worn)).toBe(53);
+    expect(currentValueOf({ match: 'res:chaos' }, worn)).toBe(15);
+    expect(currentValueOf({ match: 'res:fire' }, worn)).toBe(12);
+    expect(currentValueOf({ match: 'total:life' }, worn)).toBe(84);
+    expect(currentValueOf({ match: 'total:strength' }, worn)).toBe(30);
+    expect(currentValueOf({ match: 'total:intelligence' }, worn)).toBe(0);
+    expect(currentValueOf({ match: '#% increased Attack Speed' }, worn)).toBe(18);
+    expect(currentValueOf({ match: 'Adds # to # Fire Damage to Attacks' }, worn)).toBe(15);
+    expect(currentValueOf({ match: '+# to Evasion Rating' }, worn)).toBe(120);
+  });
+
+  it('sets a hard minimum only where the worn item has the stat', () => {
+    const s = withWornMinimums(
+      [
+        { id: 'pseudo.pseudo_total_cold_resistance', label: 'Cold resistance', effect: 40, value: 15, match: 'res:cold' },
+        { id: 'explicit.stat_crit', label: 'x% increased Critical Hit Chance', effect: 30, value: 22, match: '#% increased Critical Hit Chance' },
+      ],
+      worn,
+    );
+    expect(s[0].atLeast).toBe(53);
+    expect(s[1].atLeast).toBeUndefined();
   });
 });
 

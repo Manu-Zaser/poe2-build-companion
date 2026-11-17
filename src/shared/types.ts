@@ -243,6 +243,8 @@ export interface UpgradeRequest {
   dpsWeight: number;
   /** Only listings with instant buyout. */
   instantOnly: boolean;
+  /** Each searched stat at least as high as on the worn item. */
+  wornMinimum?: boolean;
 }
 
 export interface UpgradeCandidate {

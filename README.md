@@ -30,6 +30,9 @@ to search. One click on **Find upgrades** then, per slot:
    resistance below the cap, miss an attribute requirement, overdraw spirit or lose movement speed are never shown
    as upgrades.
 
+**At least what you wear** (switch) sets each searched stat's minimum to the value on your worn item, so only items
+that beat yours stat by stat are found.
+
 Damage means your main skill's DPS. If the main skill selected in Path of Building does no damage (e.g. an aura
 group), the skill with the highest DPS is used instead – for the item check too – and the page says so.
 
@@ -70,6 +73,9 @@ overlay answers within a fraction of a second:
 - **Equip in my build** puts the item into the local copy of your build – no new import needed. The character page
   shows "1 item changed since" with a *Reset* button; local items are applied on top of every load and kept after a
   poe.ninja refresh until poe.ninja has seen the change.
+- **Find better … on the trade site** opens Path of Building's weighted search for that slot in your browser – every
+  mod weighted for your build, only items scoring higher than what you wear, best first; weighting and budget as on
+  the *Upgrades* page. Sign in on the trade site there; the app sends no trade request for it.
 
 The overlay stays open until you close it (× or Esc), can be dragged from anywhere and remembers its position.
 

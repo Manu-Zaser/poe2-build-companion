@@ -89,6 +89,30 @@ function fitBlock(fit: Fit, full: boolean): HTMLElement {
   return box;
 }
 
+const UPGRADE_SLOT_NAMES = new Set(['Weapon 1', 'Weapon 2', 'Helmet', 'Body Armour', 'Gloves', 'Boots', 'Amulet', 'Ring 1', 'Ring 2', 'Belt']);
+
+/** "Find better for this slot": PoB's weighted search in the browser, set up like the Upgrades page. */
+function weightedButton(slot: string): HTMLElement | null {
+  if (!UPGRADE_SLOT_NAMES.has(slot)) return null;
+  const b = el('button', 'link-btn', `Find better ${slotName(slot).toLowerCase()} on the trade site ↗`);
+  b.title = "Path of Building's weighted search for this slot, in your browser (sign in on the trade site there). Weighting and budget as on the Upgrades page.";
+  b.addEventListener('click', async () => {
+    let form: Record<string, unknown> = {};
+    try {
+      form = JSON.parse(localStorage.getItem('upgrades-form') ?? '{}') ?? {};
+    } catch {
+      // Standardwerte
+    }
+    b.disabled = true;
+    b.textContent = 'Opening…';
+    const res = await api.weightedSearch(slot, { dpsWeight: form.dpsWeight as number, instantOnly: form.instantOnly as boolean, budget: form.budget as number, currency: form.currency as string });
+    b.disabled = false;
+    b.textContent = res.ok ? 'Opened in your browser ✓' : `Find better ${slotName(slot).toLowerCase()} on the trade site ↗`;
+    if (!res.ok) b.title = res.error ?? 'Could not open the search';
+  });
+  return b;
+}
+
 function slotBlock(v: SlotVerdict, content: Extract<OverlayContent, { kind: 'check' }>, first: boolean): HTMLElement {
   const block = el('div', 'slot-block');
   block.append(
@@ -117,6 +141,8 @@ function slotBlock(v: SlotVerdict, content: Extract<OverlayContent, { kind: 'che
       ),
     );
   }
+  const weighted = weightedButton(v.slot);
+  if (weighted) block.append(el('div', 'weighted-line', weighted));
   return block;
 }
 

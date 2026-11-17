@@ -54,6 +54,9 @@ const api = {
   dragMove: () => ipcRenderer.send('overlay:drag-move'),
   dragEnd: () => ipcRenderer.send('overlay:drag-end'),
   equip: (slot: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('overlay:equip', slot),
+  /** Opens PoB's weighted search for a slot in the browser (weighting and budget from the Upgrades page). */
+  weightedSearch: (slot: string, opts: { dpsWeight?: number; instantOnly?: boolean; budget?: number; currency?: string }): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('overlay:weighted', slot, opts),
   openApp: () => ipcRenderer.send('overlay:open-app'),
 };
 

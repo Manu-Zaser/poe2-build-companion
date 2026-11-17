@@ -118,10 +118,12 @@ export function listingUrl(league: string, query: TradeQuery, seller: string, ba
  * item, best first), limited to the budget – opened in the user's browser. Too complex for anonymous
  * requests, but the trade site runs it for a signed-in user; the app itself sends nothing.
  */
-export function weightedSearchUrl(league: string, pob: TradeQuery, maxExalted: number): string {
+export function weightedSearchUrl(league: string, pob: TradeQuery, maxExalted: number | null): string {
   const q = structuredClone(pob);
-  const trade = q.query.filters?.trade_filters?.filters ?? {};
-  q.query.filters = { ...q.query.filters, trade_filters: { filters: { ...trade, price: { max: Math.max(1, Math.floor(maxExalted)) } } } };
+  if (maxExalted !== null) {
+    const trade = q.query.filters?.trade_filters?.filters ?? {};
+    q.query.filters = { ...q.query.filters, trade_filters: { filters: { ...trade, price: { max: Math.max(1, Math.floor(maxExalted)) } } } };
+  }
   // Leere Gruppen ("and"/"not" ohne Filter) weglassen – sie machen den Link nur länger.
   q.query.stats = q.query.stats.filter((g) => g.filters.length > 0);
   return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(q))}`;
@@ -156,7 +158,7 @@ export function anonymousUpgradeQuery(pob: TradeQuery, stats: SearchStat[], opts
   if (stats.length === 0) throw new Error('Path of Building found no mods that improve this slot');
 
   const countFilters: TradeStatFilter[] = stats.map((m) => {
-    const min = m.value !== null ? Math.floor(m.value * share) : 0;
+    const min = Math.max(m.value !== null ? Math.floor(m.value * share) : 0, m.atLeast ?? 0);
     return min >= 1 ? { id: m.id, value: { min } } : { id: m.id };
   });
 

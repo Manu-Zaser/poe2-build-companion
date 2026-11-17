@@ -25,7 +25,7 @@ import {
   type PobModWeight,
   type TradeQuery,
 } from '../shared/upgrades';
-import { defenceFilters, searchStats, type Defences } from '../shared/searchstats';
+import { defenceFilters, searchStats, withWornMinimums, type Defences } from '../shared/searchstats';
 import { blockingWarnings, judgeSlot } from '../shared/verdict';
 
 /** Candidates shown per slot. */
@@ -110,9 +110,10 @@ export async function searchSlot(
 
   // Nur die Stats, die zählen: Varianten zusammengefasst, Verteidigung passend zur Basis, Kleinkram weg.
   const defences = pob.defences ?? null;
-  const stats = searchStats(pob.mods, { slot, defences });
+  let stats = searchStats(pob.mods, { slot, defences });
+  if (req.wornMinimum && current) stats = withWornMinimums(stats, current.mods.map((m) => m.text));
   const equipment = defenceFilters(slot, defences);
-  result.searched = stats.map((x) => x.label);
+  result.searched = stats.map((x) => (x.atLeast ? `${x.label} ≥ ${x.atLeast}` : x.label));
 
   let found: SearchResponse | null = null;
   let used: TradeQuery | null = null;

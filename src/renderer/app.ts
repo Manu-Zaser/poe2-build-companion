@@ -699,8 +699,8 @@ $('ninja-open').addEventListener('click', () => void api.openNinja());
 // ---------- Upgrades page ----------
 
 const UP_FORM_KEY = 'upgrades-form';
-interface UpForm { budget: number; currency: 'divine' | 'exalted'; dpsWeight: number; instantOnly: boolean; slots?: string[] }
-let upForm: UpForm = { budget: 2, currency: 'divine', dpsWeight: 0.5, instantOnly: true };
+interface UpForm { budget: number; currency: 'divine' | 'exalted'; dpsWeight: number; instantOnly: boolean; wornMinimum: boolean; slots?: string[] }
+let upForm: UpForm = { budget: 2, currency: 'divine', dpsWeight: 0.5, instantOnly: true, wornMinimum: false };
 try {
   const saved = JSON.parse(localStorage.getItem(UP_FORM_KEY) ?? 'null') as Partial<UpForm> | null;
   if (saved) upForm = { ...upForm, ...saved };
@@ -976,6 +976,7 @@ function syncUpForm() {
   $('up-def-text').replaceChildren('Defence ', el('b', '', `${100 - d}%`));
   $('up-dmg-text').replaceChildren(el('b', '', `${d}%`), ' Damage');
   $<HTMLInputElement>('up-instant').checked = upForm.instantOnly;
+  $<HTMLInputElement>('up-worn').checked = upForm.wornMinimum;
 }
 syncUpForm();
 
@@ -1002,6 +1003,10 @@ $('up-instant').addEventListener('change', (e) => {
   upForm.instantOnly = (e.target as HTMLInputElement).checked;
   saveUpForm();
 });
+$('up-worn').addEventListener('change', (e) => {
+  upForm.wornMinimum = (e.target as HTMLInputElement).checked;
+  saveUpForm();
+});
 $('up-all').addEventListener('click', () => setSlots([...UPGRADE_SLOTS]));
 $('up-none-btn').addEventListener('click', () => setSlots([]));
 $('up-start').addEventListener('click', () => {
@@ -1013,7 +1018,7 @@ $('up-start').addEventListener('click', () => {
   }
   message('');
   void api
-    .startUpgrades({ budget, currency: upForm.currency, slots: chosenSlots(), dpsWeight: upForm.dpsWeight, instantOnly: upForm.instantOnly })
+    .startUpgrades({ budget, currency: upForm.currency, slots: chosenSlots(), dpsWeight: upForm.dpsWeight, instantOnly: upForm.instantOnly, wornMinimum: upForm.wornMinimum })
     .then(renderUpgrades);
 });
 $('up-cancel').addEventListener('click', () => api.cancelUpgrades());

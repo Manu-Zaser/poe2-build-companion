@@ -21,6 +21,10 @@ export interface SearchStat {
   effect: number;
   /** A good roll: the minimum at full strictness (null = no minimum). */
   value: number | null;
+  /** How to read this stat from an item's mod lines (for "at least what you wear"). */
+  match: string;
+  /** Hard minimum, independent of strictness (e.g. the worn item's value). */
+  atLeast?: number;
 }
 
 export interface Defences {
@@ -106,7 +110,7 @@ export function searchStats(mods: PobModWeight[], ctx: { slot: string; defences:
     if (total) {
       const [id, label] = total;
       const prev = totals.get(id);
-      if (!prev || m.effect > prev.effect) totals.set(id, { id, label, effect: m.effect, value: m.testedValue });
+      if (!prev || m.effect > prev.effect) totals.set(id, { id, label, effect: m.effect, value: m.testedValue, match: `total:${label.toLowerCase()}` });
       continue;
     }
     // "+# to all Attributes", "+# to Strength and Dexterity": covered by the single attribute totals.
@@ -119,14 +123,14 @@ export function searchStats(mods: PobModWeight[], ctx: { slot: string; defences:
         if (d.kind === 'percent' ? !sameSet(d.set, ctx.defences!) : !within(d.set, ctx.defences!)) continue;
       }
     }
-    out.push({ id: m.id, label: labelOf(text), effect: m.effect, value: m.testedValue });
+    out.push({ id: m.id, label: labelOf(text), effect: m.effect, value: m.testedValue, match: norm(text) });
   }
 
   for (const e of ELEMENTS) {
     const r = res.get(e);
     if (!r) continue;
     const value = r.value !== null ? Math.floor(r.value * RES_SHARE) : null;
-    out.push({ id: `pseudo.pseudo_total_${e}_resistance`, label: `${cap(e)} resistance`, effect: r.effect, value });
+    out.push({ id: `pseudo.pseudo_total_${e}_resistance`, label: `${cap(e)} resistance`, effect: r.effect, value, match: `res:${e}` });
   }
   out.push(...totals.values());
 
@@ -153,3 +157,60 @@ export function defenceFilters(slot: string, defences: Defences | null): Record<
   if (defences.energyShield) f.es = { min: 1 };
   return Object.keys(f).length ? f : null;
 }
+
+// ---------- Werte des getragenen Items ----------
+
+const NUM = String.raw`([+-]?\d+(?:\.\d+)?)`;
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const stripLocal = (line: string) => line.trim().replace(/\s*\(Local\)\s*$/i, '');
+
+/** Sum of a pattern ("+#% to Cold Resistance"; "Adds # to # Fire Damage" counts the average) over mod lines. */
+function sumPattern(pattern: string, lines: string[]): number {
+  const body = escapeRe(pattern.replace(/^\+(?=#)/, '')).replace(/#/g, NUM);
+  const re = new RegExp(`^\\+?${body}$`, 'i');
+  let total = 0;
+  for (const line of lines) {
+    const m = stripLocal(line).match(re);
+    if (!m) continue;
+    const nums = m.slice(1).map(Number).filter((n) => Number.isFinite(n));
+    if (nums.length) total += nums.reduce((a, b) => a + b, 0) / nums.length;
+  }
+  return total;
+}
+
+/** What the worn item has of a search stat (0 if nothing), read from its mod lines. */
+export function currentValueOf(stat: Pick<SearchStat, 'match'>, lines: string[]): number {
+  const [kind, what] = stat.match.split(':');
+  if (kind === 'res') {
+    let total = 0;
+    for (const line of lines) {
+      const m = stripLocal(line)
+        .toLowerCase()
+        .match(/^\+?(-?\d+)% to (all elemental resistances|(fire|cold|lightning|chaos)(?: and (fire|cold|lightning|chaos))? resistances?)$/);
+      if (!m) continue;
+      const covers = m[2] === 'all elemental resistances' ? what !== 'chaos' : m[3] === what || m[4] === what;
+      if (covers) total += Number(m[1]);
+    }
+    return total;
+  }
+  if (kind === 'total') {
+    if (what === 'life') return sumPattern('+# to maximum Life', lines);
+    if (what === 'mana') return sumPattern('+# to maximum Mana', lines);
+    const attr = cap(what);
+    let total = sumPattern(`+# to ${attr}`, lines) + sumPattern('+# to all Attributes', lines);
+    for (const other of ['Strength', 'Dexterity', 'Intelligence']) {
+      if (other !== attr) total += sumPattern(`+# to ${attr} and ${other}`, lines) + sumPattern(`+# to ${other} and ${attr}`, lines);
+    }
+    return total;
+  }
+  return sumPattern(stat.match, lines);
+}
+
+/** "At least what you wear": each stat's minimum becomes the worn item's value (where it has the stat). */
+export function withWornMinimums(stats: SearchStat[], lines: string[]): SearchStat[] {
+  return stats.map((s) => {
+    const v = Math.floor(currentValueOf(s, lines));
+    return v >= 1 ? { ...s, atLeast: v } : s;
+  });
+}
+

@@ -2,7 +2,7 @@
 //   npx electron scripts/run-hidden.cjs scripts/check-ui.cjs <output folder>
 // Windows stay hidden, a separate profile is used, no global hotkey is registered and no keys are
 // sent: the item check is called directly with fixture item texts.
-const { app, clipboard } = require('electron');
+const { app, clipboard, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -18,6 +18,9 @@ module.exports = (out) => {
   const code = fs.readFileSync(path.join(root, 'test/fixtures/deadeye.code'), 'utf8');
   clipboard.readText = async () => code;
   const fixture = (n) => fs.readFileSync(path.join(fixtures, n), 'utf8');
+  // Nothing opens in the browser during tests – links are only recorded.
+  const opened = [];
+  shell.openExternal = async (url) => void opened.push(url);
 
   const log = [];
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -72,6 +75,12 @@ module.exports = (out) => {
       await until(mainWc, `!document.getElementById('char').hidden`);
 
       await check(fixture('rare-gloves-advanced.txt'), '1-gloves');
+      // "Find better gloves on the trade site": PoB's weighted search, opened in the browser (recorded only).
+      await overlayWc.executeJavaScript(`document.querySelector('.weighted-line .link-btn').click()`);
+      await until(overlayWc, `document.querySelector('.weighted-line .link-btn').textContent.includes('✓') || document.querySelector('.weighted-line .link-btn').title.length > 200`, 60_000);
+      const wq = opened.at(-1) ?? '';
+      const parsed = wq.includes('?q=') ? JSON.parse(decodeURIComponent(wq.split('?q=')[1])) : null;
+      log.push(`weighted search: ${wq.split('?')[0]} | groups ${parsed?.query.stats.map((g) => `${g.type}(${g.filters.length}, min ${g.value?.min?.toFixed?.(1)})`).join(', ')} | price ${JSON.stringify(parsed?.query.filters?.trade_filters ?? null)}`);
       await check(fixture('rare-ring.txt'), '2-ring');
       await check(fixture('rare-body-armour-hybrid.txt'), '3-body');
       await check('Hello, not an item', '4-not-an-item');

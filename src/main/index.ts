@@ -26,7 +26,7 @@ import type {
 } from '../shared/types';
 import { fetchCurrencyRates, fetchLeagues, type CurrencyRates } from '@poe2/core/ninja';
 import { RateLimitError, TradeClient } from '@poe2/core/trade';
-import { UPGRADE_SLOTS } from '../shared/upgrades';
+import { UPGRADE_SLOTS, weightedSearchUrl, type TradeQuery } from '../shared/upgrades';
 import { runUpgradeSearch, SearchCancelled } from './upgradesearch';
 import { fitForSlot, parseTargetBuild, type Fit, type TargetBuild } from '../shared/targets';
 import { judgeItem } from '../shared/verdict';
@@ -617,6 +617,7 @@ function registerIpc() {
   ipcMain.on('overlay:drag-start', () => overlay.startDrag());
   ipcMain.on('overlay:drag-move', () => overlay.moveDrag());
   ipcMain.on('overlay:drag-end', () => overlay.endDrag());
+  ipcMain.handle('overlay:weighted', (_e, slot: unknown, opts: unknown) => (typeof slot === 'string' ? openWeightedSearch(slot, opts) : { ok: false, error: 'Invalid slot.' }));
   ipcMain.handle('overlay:equip', (_e, slot: unknown) => (typeof slot === 'string' ? equipLast(slot) : { ok: false, error: 'Invalid slot.' }));
   ipcMain.on('overlay:open-app', () => {
     if (!mainWin) return;
@@ -644,6 +645,39 @@ async function tradeLeague(): Promise<string> {
   return (await fetchLeagues(userAgent()))[0];
 }
 
+/** poe.ninja exchange rates of the league, at most one request per 30 minutes. */
+async function currentRates(league: string): Promise<CurrencyRates> {
+  if (!ratesCache || ratesCache.league !== league || Date.now() - ratesCache.fetchedAt > RATES_TTL_MS) {
+    ratesCache = await fetchCurrencyRates(league, userAgent());
+  }
+  return ratesCache;
+}
+
+/**
+ * Item check: Path of Building's weighted search for a slot, opened in the browser (the trade site runs it
+ * for the signed-in user; the app sends no trade request). Weighting and budget as on the Upgrades page.
+ */
+async function openWeightedSearch(slot: string, raw: unknown): Promise<{ ok: boolean; error?: string }> {
+  if (!(UPGRADE_SLOTS as readonly string[]).includes(slot)) return { ok: false, error: 'No weighted search for this slot.' };
+  if (!overview) return { ok: false, error: 'Load your build first.' };
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const dps = Number.isFinite(Number(o.dpsWeight)) ? Math.min(1, Math.max(0, Number(o.dpsWeight))) : 0.5;
+  try {
+    const { result } = await engine.request<{ query: TradeQuery }>('upgradeQuery', { slot, dpsWeight: dps, ehpWeight: 1 - dps, instantOnly: o.instantOnly !== false }, 120_000);
+    const league = await tradeLeague();
+    const budget = Number(o.budget);
+    let maxExalted = 0;
+    if (Number.isFinite(budget) && budget > 0) {
+      maxExalted = o.currency === 'exalted' ? budget : budget * (await currentRates(league)).exaltedPerDivine;
+    }
+    void shell.openExternal(weightedSearchUrl(league, result.query, maxExalted > 0 ? maxExalted : null));
+    log(`weighted search opened for ${slot}`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: message(err) };
+  }
+}
+
 function sanitizeUpgradeRequest(v: unknown): UpgradeRequest | null {
   if (!v || typeof v !== 'object') return null;
   const r = v as Record<string, unknown>;
@@ -658,6 +692,7 @@ function sanitizeUpgradeRequest(v: unknown): UpgradeRequest | null {
     slots,
     dpsWeight: Number.isFinite(dpsWeight) ? Math.min(1, Math.max(0, dpsWeight)) : 0.5,
     instantOnly: r.instantOnly !== false,
+    wornMinimum: r.wornMinimum === true,
   };
 }
 
@@ -674,10 +709,7 @@ async function startUpgradeSearch(raw: unknown): Promise<UpgradeRun> {
   const started = Date.now();
   try {
     const league = await tradeLeague();
-    if (!ratesCache || ratesCache.league !== league || Date.now() - ratesCache.fetchedAt > RATES_TTL_MS) {
-      ratesCache = await fetchCurrencyRates(league, userAgent());
-    }
-    const rates = ratesCache;
+    const rates = await currentRates(league);
     trade ??= new TradeClient(userAgent());
     upgradeRun.league = league;
     upgradeRun.exaltedPerDivine = rates.exaltedPerDivine;

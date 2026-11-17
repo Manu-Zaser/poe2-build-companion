@@ -84,3 +84,9 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .fit-list li.miss { color: #f0b3a7; }
 .fit-list li.minor { opacity: .55; }
 .fit-list small { color: var(--faint); margin-left: 4px; }
+
+/* "Find better … on the trade site" – PoB's weighted search in the browser */
+.weighted-line { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.link-btn { border: 0; background: none; padding: 0; color: var(--gold); cursor: pointer; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
+.link-btn:hover { color: var(--gold-bright); }
+.link-btn:disabled { color: var(--faint); cursor: default; text-decoration: none; }
