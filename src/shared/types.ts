@@ -279,6 +279,8 @@ export interface UpgradeSlotResult {
   overBudget?: number;
   /** The search on the trade site (to buy by hand). */
   tradeUrl?: string;
+  /** Path of Building's weighted search within the budget, for the browser (where the user is signed in). */
+  weightedUrl?: string;
   /** What was searched for, most valuable first (e.g. "Cold resistance", "x% increased Attack Speed"). */
   searched?: string[];
   /** Best first; at most a handful. */

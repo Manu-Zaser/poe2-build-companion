@@ -21,6 +21,7 @@ import {
   rankCandidates,
   scoreCandidate,
   tradeSearchUrl,
+  weightedSearchUrl,
   type PobModWeight,
   type TradeQuery,
 } from '../shared/upgrades';
@@ -104,6 +105,8 @@ export async function searchSlot(
   const ms = slot === 'Boots' ? movementSpeedOf((current?.mods ?? []).map((m) => m.text)) : 0;
   const required = ms > 0 ? [{ id: MOVEMENT_SPEED_STAT, value: { min: ms } }] : [];
   const maxExalted = budgetInExalted(deps.rates, req.budget, req.currency);
+  // PoBs gewichtete Suche als Link für den Browser – kostet keine Anfrage der App.
+  result.weightedUrl = weightedSearchUrl(deps.league, pob.query, maxExalted);
 
   // Nur die Stats, die zählen: Varianten zusammengefasst, Verteidigung passend zur Basis, Kleinkram weg.
   const defences = pob.defences ?? null;

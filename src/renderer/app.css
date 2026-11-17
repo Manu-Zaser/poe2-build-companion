@@ -406,3 +406,7 @@ h3 { margin: 0 0 8px; font: 600 11px var(--font-display); letter-spacing: .1em; 
 .up-searched { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: -2px 0 10px; }
 .up-searched .up-label { margin-right: 4px; }
 .up-searched .chip { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--surface-3); border: 1px solid var(--line); color: var(--muted); }
+.up-links { display: flex; gap: 6px; align-items: center; }
+.up-links .btn { text-decoration: none; }
+.up-weighted { color: var(--gold-bright); border-color: var(--gold-deep); background: rgba(201,168,92,.08); }
+.up-weighted:hover { color: var(--gold-bright); background: rgba(201,168,92,.16); }

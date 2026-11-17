@@ -872,15 +872,27 @@ function slotResult(r: UpgradeSlotResult): HTMLElement {
     el('div', '', el('div', 'up-slot-title', r.slot), sub),
     r.error ? el('span', '') : best ? el('span', 'up-best yes', `Best ${signed(best.gain)}`) : el('span', 'up-best no', 'No upgrade in budget'),
   );
-  if (r.tradeUrl) {
-    const a = el('a', 'btn sm ghost', 'Search on trade site ↗');
-    a.href = r.tradeUrl;
+  const link = (cls: string, text: string, url: string, title: string) => {
+    const a = el('a', cls, text);
+    a.href = url;
     a.target = '_blank';
     a.rel = 'noreferrer';
-    head.append(a);
-  } else {
-    head.append(el('span', ''));
+    a.title = title;
+    return a;
+  };
+  const links = el('span', 'up-links');
+  if (r.weightedUrl) {
+    links.append(
+      link(
+        'btn sm up-weighted',
+        'Weighted search ↗',
+        r.weightedUrl,
+        "Path of Building's weighted search on the trade site: every mod weighted for your build, only items that score higher than yours, within the budget, best first. Opens in your browser – sign in on the trade site there.",
+      ),
+    );
   }
+  if (r.tradeUrl) links.append(link('btn sm ghost', 'Our search ↗', r.tradeUrl, 'The search these listings come from'));
+  head.append(links);
 
   const card = el('section', `card up-slot-card${best ? ' has-upgrade' : ''}`, head);
   if (r.searched?.length) {

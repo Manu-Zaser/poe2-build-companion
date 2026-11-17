@@ -34,7 +34,9 @@ Damage means your main skill's DPS. If the main skill selected in Path of Buildi
 group), the skill with the highest DPS is used instead – for the item check too – and the page says so.
 
 Buying stays with you: click a listing to open the trade site with that listing on top (each slot also links its
-whole search). Listings above the budget are left out even if the trade site lets them through – it converts
+whole search). **Weighted search** opens Path of Building's own weighted search for the slot in your browser – every
+mod weighted for your build, only items scoring higher than the worn one, within the budget, best first. It is too
+complex for anonymous requests, but the trade site runs it when you are signed in there; the app sends nothing. Listings above the budget are left out even if the trade site lets them through – it converts
 prices with its own exchange rate. The search waits for the trade site's rate
 limits and stops (keeping what it found) if a limit would be exceeded. Prices are converted with poe.ninja's
 exchange rates.

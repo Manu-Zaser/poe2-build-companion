@@ -15,6 +15,7 @@ import {
   rankCandidates,
   scoreCandidate,
   tradeSearchUrl,
+  weightedSearchUrl,
   type PobModWeight,
   type TradeQuery,
 } from '../src/shared/upgrades';
@@ -138,6 +139,27 @@ describe('anonymous upgrade search', () => {
     expect(back.query.stats).toEqual(q.query.stats);
     // The original query stays untouched.
     expect(q.query.type).toBeUndefined();
+  });
+
+  it("links PoB's weighted search within the budget for the browser", () => {
+    const pob: TradeQuery = {
+      query: {
+        status: { option: 'securable' },
+        filters: { type_filters: { filters: { category: { option: 'armour.gloves' } } } },
+        stats: [
+          { type: 'weight', value: { min: 22.09 }, filters: [{ id: 'explicit.stat_a', value: { weight: 31.5 } }] },
+          { type: 'and', filters: [] },
+        ],
+      },
+      sort: { 'statgroup.0': 'desc' },
+    };
+    const url = weightedSearchUrl('Forbidden Rites', pob, 5440.7);
+    const back = JSON.parse(decodeURIComponent(url.split('?q=')[1])) as TradeQuery;
+    expect(back.sort).toEqual({ 'statgroup.0': 'desc' });
+    expect(back.query.stats).toEqual([pob.query.stats[0]]);
+    expect(back.query.filters?.trade_filters).toEqual({ filters: { price: { max: 5440 } } });
+    expect(back.query.filters?.type_filters).toEqual(pob.query.filters?.type_filters);
+    expect(pob.query.stats).toHaveLength(2);
   });
 
   it('links the search on the trade site', () => {
@@ -302,6 +324,7 @@ describe('upgrade search flow', () => {
     expect(r.total).toBe(25);
     expect(r.evaluated).toBe(3);
     expect(r.tradeUrl).toBe('https://www.pathofexile.com/trade2/search/poe2/Forbidden%20Rites/q1');
+    expect(r.weightedUrl).toMatch(/^https:\/\/www\.pathofexile\.com\/trade2\/search\/poe2\/Forbidden%20Rites\?q=/);
     expect(r.candidates[0].item.name).toBe('Candidate 1');
     expect(r.candidates[0].upgrade).toBe(true);
     expect(r.candidates[0].ehpPct).toBeCloseTo(6);

@@ -113,6 +113,20 @@ export function listingUrl(league: string, query: TradeQuery, seller: string, ba
   return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(q))}`;
 }
 
+/**
+ * Path of Building's own weighted search (every mod weighted for this build, at least the score of the worn
+ * item, best first), limited to the budget – opened in the user's browser. Too complex for anonymous
+ * requests, but the trade site runs it for a signed-in user; the app itself sends nothing.
+ */
+export function weightedSearchUrl(league: string, pob: TradeQuery, maxExalted: number): string {
+  const q = structuredClone(pob);
+  const trade = q.query.filters?.trade_filters?.filters ?? {};
+  q.query.filters = { ...q.query.filters, trade_filters: { filters: { ...trade, price: { max: Math.max(1, Math.floor(maxExalted)) } } } };
+  // Leere Gruppen ("and"/"not" ohne Filter) weglassen – sie machen den Link nur länger.
+  q.query.stats = q.query.stats.filter((g) => g.filters.length > 0);
+  return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(q))}`;
+}
+
 /** The trade site's page for a search, to look at and buy by hand. */
 export function tradeSearchUrl(league: string, queryId: string): string {
   return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}/${encodeURIComponent(queryId)}`;
