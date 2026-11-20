@@ -51,6 +51,8 @@ export interface PobModWeight {
 export interface AnonymousQueryOptions {
   /** Budget per item as Exalted equivalent (the trade site's default price unit for PoE2). */
   maxExalted: number;
+  /** Lower price limit as Exalted equivalent (for the price levels of a big market). */
+  minExalted?: number;
   /** How many of the stats an item must have. */
   minCount?: number;
   /** A mod only counts with at least this share of PoB's tested (middle) roll. */
@@ -96,6 +98,33 @@ export function pickCandidates(ids: string[], count = CANDIDATES_PER_SLOT, cheap
   const n = count - head.length;
   const picked = Array.from({ length: n }, (_, i) => rest[Math.round(((i + 1) * rest.length) / n) - 1]);
   return [...head, ...picked];
+}
+
+/**
+ * A big market (more matches than the one page of ids the trade site returns) is searched again from these
+ * shares of the budget upwards: the cheapest page of 10 000 helmets only holds 1-Chaos items, the items worth
+ * buying for the budget would never be calculated. Each level adds one search per slot.
+ */
+export const PRICE_LEVELS: readonly number[] = [0.1, 0.33];
+/** The trade site returns at most this many ids per search. */
+export const IDS_PER_SEARCH = 100;
+
+/**
+ * Listings to calculate from several price levels (each list sorted by price, cheapest first): the same number
+ * from each level, the cheapest few of it plus an even spread over the rest; duplicates only once.
+ */
+export function pickFromLevels(lists: string[][], count = CANDIDATES_PER_SLOT): string[][] {
+  const filled = lists.filter((l) => l.length > 0);
+  if (filled.length <= 1) return filled.map((l) => pickCandidates(l, count));
+  const seen = new Set<string>();
+  const per = Math.floor(count / filled.length);
+  return filled.map((l, i) => {
+    const want = i === filled.length - 1 ? count - per * (filled.length - 1) : per;
+    const fresh = l.filter((id) => !seen.has(id));
+    const picked = pickCandidates(fresh, want, Math.ceil(want / 3));
+    for (const id of picked) seen.add(id);
+    return picked;
+  });
 }
 
 /** Slots the upgrade search covers (the equipment slots PoB's trade search supports). */
@@ -166,7 +195,9 @@ export function anonymousUpgradeQuery(pob: TradeQuery, stats: SearchStat[], opts
   const type = pob.query.filters?.type_filters;
   if (type) filters.type_filters = { filters: { ...type.filters } };
   if (opts.equipment) filters.equipment_filters = { filters: { ...opts.equipment } };
-  filters.trade_filters = { filters: { price: { max: Math.max(1, Math.floor(opts.maxExalted)) } } };
+  const price: { min?: number; max: number } = { max: Math.max(1, Math.floor(opts.maxExalted)) };
+  if (opts.minExalted !== undefined && opts.minExalted >= 1 && opts.minExalted < price.max) price.min = Math.floor(opts.minExalted);
+  filters.trade_filters = { filters: { price } };
 
   const stats_: TradeStatGroup[] = [{ type: 'count', value: { min: Math.min(opts.minCount ?? DEFAULT_MIN_COUNT, stats.length) }, filters: countFilters }];
   if (opts.required?.length) stats_.push({ type: 'and', filters: opts.required });

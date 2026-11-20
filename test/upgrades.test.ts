@@ -12,6 +12,8 @@ import {
   listingUrl,
   movementSpeedOf,
   pickCandidates,
+  pickFromLevels,
+  PRICE_LEVELS,
   rankCandidates,
   scoreCandidate,
   tradeSearchUrl,
@@ -128,6 +130,26 @@ describe('anonymous upgrade search', () => {
     expect(picked.slice(0, 10)).toEqual(ids.slice(0, 10));
     expect(picked.at(-1)).toBe('id99');
     expect(pickCandidates(ids.slice(0, 7))).toEqual(ids.slice(0, 7));
+  });
+
+  it('spreads the calculated listings over the price levels of a big market', () => {
+    const level = (p: string) => Array.from({ length: 100 }, (_, i) => `${p}${i}`);
+    const picks = pickFromLevels([level('cheap'), level('mid'), level('top')], 30);
+    expect(picks.map((l) => l.length)).toEqual([10, 10, 10]);
+    expect(picks[1][0]).toBe('mid0');
+    expect(picks[2].at(-1)).toBe('top99');
+    // Listings found on two levels are calculated once.
+    const twice = pickFromLevels([['a', 'b', 'c'], ['b', 'c', 'd']], 4);
+    expect(twice).toEqual([['a', 'c'], ['b', 'd']]);
+    expect(new Set(twice.flat()).size).toBe(4);
+    // One level: as before.
+    expect(pickFromLevels([level('x')])[0]).toEqual(pickCandidates(level('x')));
+  });
+
+  it('sets a lower price limit for a price level', () => {
+    const q = anonymousUpgradeQuery(pobQuery, stats, { maxExalted: 1000, minExalted: 330 });
+    expect(q.query.filters?.trade_filters).toEqual({ filters: { price: { min: 330, max: 1000 } } });
+    expect(anonymousUpgradeQuery(pobQuery, stats, { maxExalted: 1000, minExalted: 0.5 }).query.filters?.trade_filters).toEqual({ filters: { price: { max: 1000 } } });
   });
 
   it('links one listing: same search, limited to the seller and base type', () => {
@@ -373,6 +395,28 @@ describe('upgrade search flow', () => {
     const q = searches[0] as TradeQuery;
     expect(q.query.stats[1]).toEqual({ type: 'and', filters: [{ id: MOVEMENT_SPEED_STAT, value: { min: 25 } }] });
     expect(q.query.filters?.trade_filters).toEqual({ filters: { price: { max: 1000 } } });
+  });
+
+  it('searches higher price levels when the cheapest page cannot cover a big market', async () => {
+    const { deps, searches } = fakes([500, 300, 120]);
+    const fetched: string[] = [];
+    const fetch = deps.trade.fetchListings;
+    deps.trade.fetchListings = async (id, ids) => {
+      fetched.push(id);
+      return fetch(id, ids);
+    };
+    const r = await searchSlot('Boots', boots, req, deps, { index: 0, count: 1 });
+    expect(searches).toHaveLength(1 + PRICE_LEVELS.length);
+    // Budget 2 div = 1000 ex: levels from 10 % and 33 % of it, same stats as the first search.
+    expect((searches[1] as TradeQuery).query.filters?.trade_filters).toEqual({ filters: { price: { min: 100, max: 1000 } } });
+    expect((searches[2] as TradeQuery).query.filters?.trade_filters).toEqual({ filters: { price: { min: 330, max: 1000 } } });
+    expect((searches[2] as TradeQuery).query.stats).toEqual((searches[0] as TradeQuery).query.stats);
+    expect(r.priceLevels).toBe(3);
+    expect(r.total).toBe(500);
+    expect(r.tradeUrl).toMatch(/\/q1$/);
+    // The fake returns the same three listings on every level – each is fetched and calculated once.
+    expect(fetched).toEqual(['q1']);
+    expect(r.evaluated).toBe(3);
   });
 
   it('leaves out listings above the budget even if the trade site let them through', async () => {

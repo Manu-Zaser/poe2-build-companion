@@ -279,6 +279,8 @@ export interface UpgradeSlotResult {
   evaluated: number;
   /** Fetched listings left out because they cost more than the budget (the trade site converts prices its own way). */
   overBudget?: number;
+  /** Price levels searched (1 = cheapest page only; more for big markets, see PRICE_LEVELS). */
+  priceLevels?: number;
   /** The search on the trade site (to buy by hand). */
   tradeUrl?: string;
   /** Path of Building's weighted search within the budget, for the browser (where the user is signed in). */

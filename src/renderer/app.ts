@@ -863,7 +863,7 @@ function slotResult(r: UpgradeSlotResult): HTMLElement {
 
   const sub = el('div', 'up-slot-sub');
   if (r.current) sub.append(el('span', 'cur', r.current), ' · ');
-  sub.append(r.error ? 'search failed' : `${fmt(r.total)} listing${r.total === 1 ? '' : 's'} · ${r.evaluated} calculated${r.overBudget ? ` · ${r.overBudget} over budget left out` : ''}`);
+  sub.append(r.error ? 'search failed' : `${fmt(r.total)} listing${r.total === 1 ? '' : 's'} · ${r.evaluated} calculated${r.priceLevels && r.priceLevels > 1 ? ` from ${r.priceLevels} price levels` : ''}${r.overBudget ? ` · ${r.overBudget} over budget left out` : ''}`);
 
   const head = el(
     'div',

@@ -16,7 +16,9 @@ import {
   MOVEMENT_SPEED_STAT,
   listingUrl,
   movementSpeedOf,
-  pickCandidates,
+  IDS_PER_SEARCH,
+  pickFromLevels,
+  PRICE_LEVELS,
   QUERY_STEPS,
   rankCandidates,
   scoreCandidate,
@@ -117,12 +119,14 @@ export async function searchSlot(
 
   let found: SearchResponse | null = null;
   let used: TradeQuery | null = null;
+  let usedStep: { minCount: number; rollShare: number } | null = null;
   for (const [i, s] of QUERY_STEPS.entries()) {
     const minCount = countFor(s, stats.length, i > 0);
     const query = anonymousUpgradeQuery(pob.query, stats, { maxExalted, minCount, rollShare: s.rollShare, required, equipment });
     deps.onProgress?.(step('search'));
     found = await rateLimited(() => deps.trade.search(deps.league, query), deps, step('search'));
     used = query;
+    usedStep = { minCount, rollShare: s.rollShare };
     check();
     if (found.total >= ENOUGH_RESULTS) break;
   }
@@ -131,12 +135,29 @@ export async function searchSlot(
   result.tradeUrl = tradeSearchUrl(deps.league, found.id);
   if (found.result.length === 0) return result;
 
-  const ids = pickCandidates(found.result);
+  // Großer Markt: die eine Seite mit Ids enthält nur die billigsten Angebote. Dann zusätzlich ab 10 % und
+  // 33 % des Budgets suchen, damit auch die Items gerechnet werden, die man sich für das Budget leisten kann.
+  const searches: SearchResponse[] = [found];
+  if (found.total > IDS_PER_SEARCH && usedStep && maxExalted > 0) {
+    for (const share of PRICE_LEVELS) {
+      const query = anonymousUpgradeQuery(pob.query, stats, { maxExalted, minExalted: maxExalted * share, minCount: usedStep.minCount, rollShare: usedStep.rollShare, required, equipment });
+      deps.onProgress?.(step('search'));
+      const level = await rateLimited(() => deps.trade.search(deps.league, query), deps, step('search'));
+      check();
+      if (level.result.length) searches.push(level);
+    }
+  }
+  result.priceLevels = searches.length;
+
+  const picks = pickFromLevels(searches.map((s) => s.result));
   const listings: FetchedListing[] = [];
-  for (let i = 0; i < ids.length; i += 10) {
-    deps.onProgress?.(step('fetch'));
-    listings.push(...(await rateLimited(() => deps.trade.fetchListings(found.id, ids.slice(i, i + 10)), deps, step('fetch'))));
-    check();
+  for (const [n, ids] of picks.entries()) {
+    const queryId = searches.filter((s) => s.result.length > 0)[n].id;
+    for (let i = 0; i < ids.length; i += 10) {
+      deps.onProgress?.(step('fetch'));
+      listings.push(...(await rateLimited(() => deps.trade.fetchListings(queryId, ids.slice(i, i + 10)), deps, step('fetch'))));
+      check();
+    }
   }
 
   // Die Trade-Seite rechnet den Preisfilter mit ihrem eigenen Divine-Kurs um, der deutlich von poe.ninja
