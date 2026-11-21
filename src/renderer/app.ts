@@ -549,7 +549,7 @@ function renderTarget(v: BuildView) {
   if (t) {
     $('target-name').textContent = t.name;
     const who = [t.build.ascendancy ?? t.build.className, t.build.level ? `level ${t.build.level}` : ''].filter(Boolean).join(' ');
-    $('target-meta').textContent = [who, t.source === 'file' ? 'from a PoB 2 file' : 'from a pasted code', `set ${ageText(t.importedAt)}`].filter(Boolean).join(' · ');
+    $('target-meta').textContent = [who, t.source === 'file' ? 'from a PoB 2 file' : t.source === 'link' ? 'from a link' : 'from a pasted code', `set ${ageText(t.importedAt)}`].filter(Boolean).join(' · ');
   }
   $('target-note').textContent = t ? `${t.build.slots.length} slots with target items` : '';
   renderTargetFiles();
@@ -680,6 +680,15 @@ document.querySelector('.nav-item[data-page=target]')?.addEventListener('click',
 $<HTMLButtonElement>('target-paste').addEventListener('click', (e) =>
   void run(e.currentTarget as HTMLButtonElement, () => api.pasteTarget(), 'Target build set – the item check now also shows whether an item fits it.'),
 );
+$<HTMLButtonElement>('target-link-use').addEventListener('click', (e) => {
+  const link = $<HTMLInputElement>('target-link').value.trim();
+  void run(e.currentTarget as HTMLButtonElement, () => api.linkTarget(link), 'Target build set from the link – the item check now also shows whether an item fits it.').then(() => {
+    if (current?.target?.source === 'link') $<HTMLInputElement>('target-link').value = '';
+  });
+});
+$<HTMLInputElement>('target-link').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('target-link-use').click();
+});
 $<HTMLButtonElement>('target-clear').addEventListener('click', (e) => void run(e.currentTarget as HTMLButtonElement, () => api.clearTarget(), 'Target build removed.'));
 api.onNotice((n) => message(n.text, n.kind));
 

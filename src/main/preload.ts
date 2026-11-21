@@ -33,6 +33,8 @@ const api = {
   },
   /** Target build (the build you follow, e.g. from a guide). */
   pasteTarget: (): Promise<Result> => ipcRenderer.invoke('target:paste'),
+  /** Target build from a link (pobb.in, pastebin, poe.ninja or a page with a PoB code). */
+  linkTarget: (link: string): Promise<Result> => ipcRenderer.invoke('target:link', link),
   useTargetFile: (path: string): Promise<Result> => ipcRenderer.invoke('target:use-file', path),
   clearTarget: (): Promise<Result> => ipcRenderer.invoke('target:clear'),
   setHotkey: (acc: string): Promise<Result> => ipcRenderer.invoke('settings:hotkey', acc),

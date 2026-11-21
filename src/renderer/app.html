@@ -210,9 +210,9 @@
           </p>
           <label class="check mcp-toggle"><input type="checkbox" id="mcp-on" /> <span>Allow AI assistants to read my build</span></label>
           <p class="section-hint">
-            Local only (no network port), read-only: the assistant cannot change your build, send anything to the game or buy
-            on the trade site. It sees the build loaded here – class, level, gear with mods, skills, keystone passives and the
-            stats PoB calculates.
+            Local only (no network port). The assistant sees the build loaded here – class, level, gear with mods, skills,
+            keystone passives and the stats PoB calculates. The only thing it can change is your <b>target build</b> (e.g. from a
+            guide link you give it) – never your character, nothing in the game, no buying on the trade site.
           </p>
         </div>
 
@@ -237,8 +237,10 @@
             <dt>get_character</dt><dd>Class, ascendancy, level, main skill, every equipped item with mods, jewels, skill gems, keystones.</dd>
             <dt>get_stats</dt><dd>Life, energy shield, spirit, evasion, resistances, maximum hits, attributes, DPS – calculated by Path of Building.</dd>
             <dt>evaluate_item</dt><dd>Paste an item text: Path of Building shows how much damage and defence it would add or cost in each slot.</dd>
+            <dt>get_target</dt><dd>Your target build and, slot by slot, which of its stats your gear already has and which are missing.</dd>
+            <dt>set_target_build</dt><dd>Sets the target build from a PoB code or a link (pobb.in, pastebin, poe.ninja, a page with a PoB code). Shown here right away.</dd>
           </dl>
-          <p class="section-hint">Try: "Which of my items should I upgrade first?" or "Is this ring better than mine?" with the item text.</p>
+          <p class="section-hint">Try: "Which of my items should I upgrade first?", "Is this ring better than mine?" with the item text, or "Use this guide as my target and tell me what I'm missing" with a pobb.in link.</p>
         </div>
       </section>
       <!-- TARGET BUILD -->
@@ -256,6 +258,10 @@
           </p>
           <div class="row">
             <button class="btn primary" id="target-paste">Paste target code</button>
+          </div>
+          <div class="link-row target-link-row">
+            <input type="text" id="target-link" placeholder="Or a link: pobb.in, pastebin, poe.ninja character, or a guide page with a PoB code" spellcheck="false" />
+            <button class="btn" id="target-link-use">Use link</button>
           </div>
           <div class="pob-files target-files" id="target-files"></div>
         </div>

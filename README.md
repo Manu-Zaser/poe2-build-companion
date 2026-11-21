@@ -52,22 +52,26 @@ that speaks MCP) can read the build and let Path of Building calculate items. **
 
 The page shows the entry to add to the AI program (`mcpServers` JSON and a `claude mcp add …` line) with Copy buttons.
 The AI program starts the server itself: this app's exe in Node mode (`ELECTRON_RUN_AS_NODE=1`) with `dist/mcp.js` –
-the app does not need to be open. Local only (stdio, no network port), read-only, no login; nothing is sent to the
-game or the trade site.
+the app does not need to be open. Local only (stdio, no network port), no login; nothing is sent to the game or the
+trade site. The only thing an assistant can change is the target build (a running app takes it over right away).
 
 | Tool | Returns |
 |---|---|
 | `get_character` | Class, ascendancy, level, main skill, equipped items with mods, jewels, skill gems, keystones |
 | `get_stats` | Life, ES, mana, spirit, evasion, resistances, maximum hits, EHP, attributes, DPS of the strongest skills |
 | `evaluate_item` | For an item text: DPS and EHP change in % per slot it fits, and the changed stats |
+| `get_target` | The target build and, per slot, which of its stats the worn item has and which are missing |
+| `set_target_build` | Sets the target build from a PoB code or a link (pobb.in, pastebin, poe.ninja, a page with a PoB code) |
 
 The build is the one loaded in the app – the watched PoB file is read fresh on every call, so a save in PoB is seen
 right away.
 
 ## Target build (phase 3)
 
-On the *Target build* page, set the build you follow – paste its Path of Building code (e.g. from a guide) or use a
-build saved in Path of Building 2. Each slot's item becomes a short list of target stats (boots: movement speed, life,
+On the *Target build* page, set the build you follow – paste its Path of Building code (e.g. from a guide), use a
+build saved in Path of Building 2, or paste a **link**: pobb.in, pastebin, a poe.ninja character, or a guide page that
+contains a PoB code or a pobb.in link (read once, when you click). Pages behind bot checks – e.g. Mobalytics – cannot be
+read automatically; copy the code from their "Path of Building" button instead. Each slot's item becomes a short list of target stats (boots: movement speed, life,
 resistances …; a unique: that unique).
 
 - **Item check:** the overlay adds "Fits your build: 3 of 4 target stats" with a checklist (✓ has, ✗ missing, your

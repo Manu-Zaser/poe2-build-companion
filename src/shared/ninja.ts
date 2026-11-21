@@ -81,7 +81,7 @@ export function iconsFromModel(model: Record<string, unknown>): ItemIcon[] {
   return icons;
 }
 
-type FetchLike = (
+export type FetchLike = (
   url: string,
   init?: { headers?: Record<string, string> },
 ) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;

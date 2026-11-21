@@ -1,5 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, shell } from 'electron';
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, unwatchFile, watchFile, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { decodeBuildCode, encodeBuildCode, MAX_CODE_LENGTH, normalizeBuildCode } from '../shared/buildcode';
 import { readItemText as readGameItemText } from '@poe2/core/clipboard';
@@ -29,6 +29,8 @@ import { RateLimitError, TradeClient } from '@poe2/core/trade';
 import { UPGRADE_SLOTS, weightedSearchUrl, type TradeQuery } from '../shared/upgrades';
 import { runUpgradeSearch, SearchCancelled } from './upgradesearch';
 import { fitForSlot, parseTargetBuild, type Fit, type TargetBuild } from '../shared/targets';
+import { buildFromLink } from '../shared/targetlink';
+import { makeTarget, targetName } from '../shared/targetstore';
 import { judgeItem } from '../shared/verdict';
 import { Engine } from './engine';
 import { log } from './log';
@@ -134,7 +136,9 @@ function sanitizeTarget(v: unknown): StoredTarget | undefined {
   const t = v as Record<string, unknown>;
   const code = typeof t.code === 'string' ? normalizeBuildCode(t.code) : null;
   if (!code || typeof t.name !== 'string' || typeof t.importedAt !== 'string') return undefined;
-  return { code, name: t.name.slice(0, 200), source: t.source === 'file' ? 'file' : 'paste', importedAt: t.importedAt };
+  const source = t.source === 'file' || t.source === 'link' ? t.source : 'paste';
+  const link = source === 'link' && typeof t.link === 'string' ? t.link.slice(0, 500) : undefined;
+  return { code, name: t.name.slice(0, 200), source, ...(link ? { link } : {}), importedAt: t.importedAt };
 }
 
 function loadStore(): StoredState {
@@ -148,11 +152,44 @@ function loadStore(): StoredState {
 
 let store: StoredState = { settings: { hotkey: DEFAULT_HOTKEY } };
 
+/** What the app itself wrote last – to tell its own saves from changes by the MCP server. */
+let lastWritten = '';
+
 function saveStore() {
   // Write to a temp file first so a crash never leaves a half-written file.
   const file = storeFile();
-  writeFileSync(`${file}.tmp`, JSON.stringify(store, null, 2));
+  lastWritten = JSON.stringify(store, null, 2);
+  writeFileSync(`${file}.tmp`, lastWritten);
   renameSync(`${file}.tmp`, file);
+}
+
+/**
+ * The MCP server (started by an AI assistant) may set the target build in the same file. Take over such a
+ * change right away, so the next save of the app does not undo it. Once a second – a tiny file.
+ */
+function watchStoreFile() {
+  watchFile(storeFile(), { interval: 1000 }, () => {
+    let text: string;
+    try {
+      text = readFileSync(storeFile(), 'utf8');
+    } catch {
+      return;
+    }
+    if (text === lastWritten) return;
+    try {
+      const disk = JSON.parse(text) as Partial<StoredState>;
+      const target = sanitizeTarget(disk.target);
+      if (JSON.stringify(target) === JSON.stringify(store.target)) return;
+      store.target = target;
+      targetCache = null;
+      lastWritten = text;
+      log(`target build changed outside the app (${target ? target.name : 'removed'})`);
+      pushView();
+      if (target) notify(`Your AI assistant set the target build: ${target.name}`);
+    } catch {
+      // halb geschrieben – beim nächsten Mal
+    }
+  });
 }
 
 // ---------- Engine ----------
@@ -202,22 +239,18 @@ function targetBuild(): TargetBuild | null {
 function targetView(): TargetView | undefined {
   const t = store.target;
   const build = targetBuild();
-  return t && build ? { name: t.name, source: t.source, importedAt: t.importedAt, build } : undefined;
+  return t && build ? { name: t.name, source: t.source, ...(t.link ? { link: t.link } : {}), importedAt: t.importedAt, build } : undefined;
 }
 
 /** Sets the target build from an XML text. Throws with a user-facing message. */
-function setTarget(xml: string, name: string, source: 'paste' | 'file') {
-  const build = parseTargetBuild(xml);
-  if (build.slots.length === 0) throw new Error('This build has no equipment to compare with. Use a build that has items, e.g. from a guide.');
-  const code = normalizeBuildCode(encodeBuildCode(xml));
-  if (!code) throw new Error('This build is too large.');
-  store.target = { code, name, source, importedAt: new Date().toISOString() };
-  targetCache = { code, build };
+function setTarget(xml: string, name: string, source: 'paste' | 'file' | 'link', link?: string) {
+  const { target, build } = makeTarget(xml, name, source, link);
+  store.target = target;
+  targetCache = { code: target.code, build };
   saveStore();
   pushView();
 }
 
-const targetName = (b: TargetBuild) => [b.ascendancy ?? b.className, b.level ? `level ${b.level}` : ''].filter(Boolean).join(' ') || 'Target build';
 
 function view(): BuildView {
   return { build: store.build, settings: store.settings, overview, engine: engineState, engineError, loadMs, hotkeyActive, target: targetView() };
@@ -554,6 +587,18 @@ function registerIpc() {
       return fail(err);
     }
   });
+  ipcMain.handle('target:link', async (_e, link: unknown): Promise<Result> => {
+    if (typeof link !== 'string' || !link.trim()) return fail('Paste a link first.');
+    try {
+      const found = await buildFromLink(link.slice(0, 2000), userAgent());
+      const xml = decodeBuildCode(found.code);
+      setTarget(xml, `${targetName(parseTargetBuild(xml))} · ${found.origin}`, 'link', link.trim());
+      log(`target build from link (${found.origin})`);
+      return ok();
+    } catch (err) {
+      return fail(err);
+    }
+  });
   ipcMain.handle('target:use-file', (_e, path: unknown): Result => {
     if (typeof path !== 'string') return fail('Invalid file.');
     try {
@@ -857,6 +902,12 @@ if (!app.requestSingleInstanceLock()) {
   });
   void app.whenReady().then(() => {
     store = loadStore();
+    try {
+      lastWritten = readFileSync(storeFile(), 'utf8');
+    } catch {
+      // noch keine Datei
+    }
+    watchStoreFile();
     registerIpc();
     createMainWindow();
     overlay.create();
@@ -872,6 +923,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('will-quit', () => {
     globalShortcut.unregisterAll();
     stopWatchingFile();
+    unwatchFile(storeFile());
     overlay.destroy();
     engine.stop();
   });

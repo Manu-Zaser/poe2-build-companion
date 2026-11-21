@@ -6,7 +6,7 @@
  * this script. Local only (stdio, no network port), read-only, never sends anything to the game or trade site.
  * Works only while "AI connection (MCP)" is turned on in the app's settings – checked on every call.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Engine } from '../main/engine';
@@ -15,6 +15,10 @@ import { decodeBuildCode } from '../shared/buildcode';
 import type { Comparison, Overview, StoredState } from '../shared/types';
 import { handleMessage, type ServerInfo, type Tool } from './protocol';
 import { characterSummary, comparisonSummary, statsSummary } from './tools';
+import { buildFromLink, looksLikeLink } from '../shared/targetlink';
+import { makeTarget, targetProgress } from '../shared/targetstore';
+import { parseTargetBuild } from '../shared/targets';
+import { normalizeBuildCode } from '../shared/buildcode';
 
 const err = (m: string) => process.stderr.write(`[build-companion-mcp] ${m}\n`);
 
@@ -31,6 +35,16 @@ function version(): string {
   }
 }
 
+const storeFile = () => join(userData, 'companion.json');
+
+/** Writes the target into the app's file (temp file first); a running app picks the change up by itself. */
+function writeTarget(target: StoredState['target']) {
+  const raw = JSON.parse(readFileSync(storeFile(), 'utf8')) as Record<string, unknown>;
+  raw.target = target;
+  writeFileSync(`${storeFile()}.mcp.tmp`, JSON.stringify(raw, null, 2));
+  renameSync(`${storeFile()}.mcp.tmp`, storeFile());
+}
+
 function readStore(): StoredState | null {
   try {
     return JSON.parse(readFileSync(join(userData, 'companion.json'), 'utf8')) as StoredState;
@@ -43,11 +57,16 @@ const engine = new Engine(join(__dirname, 'engine.js'), pobDir, err);
 let loaded: { key: string; overview: Overview; source: string } | null = null;
 
 /** The build as the app has it: the watched PoB file when there is one (always fresh), else the stored code. */
-async function currentBuild(): Promise<{ overview: Overview; source: string }> {
+function enabledStore(): StoredState {
   const store = readStore();
   if (!store?.settings?.mcp) {
     throw new Error('The AI connection is turned off. The player can turn it on in PoE2 Build Companion → AI connection ("Allow AI assistants to read my build").');
   }
+  return store;
+}
+
+async function currentBuild(): Promise<{ overview: Overview; source: string }> {
+  const store = enabledStore();
   const b = store.build;
   if (!b) throw new Error('No build loaded in PoE2 Build Companion yet. Open the app and load your character first.');
   let xml: string;
@@ -111,13 +130,66 @@ const tools: Tool[] = [
       return comparisonSummary(result);
     },
   },
+  {
+    name: 'get_target',
+    title: 'Target build and progress',
+    description:
+      "The build the player follows (set in PoE2 Build Companion, e.g. from a guide) and, slot by slot, which of the target item's stats the player's worn item already has and which are missing. Returns null fields if no target is set.",
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    run: async () => {
+      const store = enabledStore();
+      const t = store.target;
+      if (!t) return { target: null, note: 'No target build set. Use set_target_build with a Path of Building code or a link (pobb.in, pastebin, poe.ninja, a page with a PoB code).' };
+      const build = parseTargetBuild(decodeBuildCode(t.code));
+      const gear = store.build ? (await currentBuild()).overview.gear : [];
+      return {
+        target: { name: t.name, source: t.source, ...(t.link ? { link: t.link } : {}), setAt: t.importedAt, class: build.className ?? null, ascendancy: build.ascendancy ?? null, level: build.level ?? null },
+        slots: targetProgress(build, gear),
+      };
+    },
+  },
+  {
+    name: 'set_target_build',
+    title: 'Set the target build',
+    description:
+      'Sets the build the player follows in PoE2 Build Companion – replaces the current target. Pass a Path of Building code, or a link: pobb.in, pastebin, a poe.ninja character, or a guide page that contains a PoB code. ' +
+      'Pages behind bot checks (e.g. some guide sites) cannot be read – then ask the player for the PoB code. Ask the player before replacing an existing target.',
+    writes: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code_or_link: { type: 'string', description: 'A Path of Building (PoE2) code, or a link to one.' },
+        name: { type: 'string', description: 'Optional name to show, e.g. the guide title.' },
+      },
+      required: ['code_or_link'],
+      additionalProperties: false,
+    },
+    run: async (args) => {
+      enabledStore();
+      const input = String(args.code_or_link).trim();
+      const name = typeof args.name === 'string' && args.name.trim() ? args.name.trim() : null;
+      let made;
+      if (looksLikeLink(input)) {
+        const found = await buildFromLink(input.slice(0, 2000), `poe2-build-companion-mcp/${version()}`);
+        made = makeTarget(decodeBuildCode(found.code), name, 'link', input);
+        if (!name) made.target.name = `${made.target.name} · ${found.origin}`;
+      } else {
+        const code = normalizeBuildCode(input);
+        if (!code) throw new Error('This is neither a Path of Building code nor a link.');
+        made = makeTarget(decodeBuildCode(code), name, 'paste');
+      }
+      writeTarget(made.target);
+      return { set: true, name: made.target.name, class: made.build.className ?? null, ascendancy: made.build.ascendancy ?? null, level: made.build.level ?? null, slots: made.build.slots.map((s) => s.slot) };
+    },
+  },
 ];
 
 const info: ServerInfo = {
   name: 'poe2-build-companion',
   version: version(),
   instructions:
-    "Read-only access to the player's Path of Exile 2 build from PoE2 Build Companion. All numbers are calculated by Path of Building. " +
+    "Access to the player's Path of Exile 2 build from PoE2 Build Companion. All numbers are calculated by Path of Building. " +
+      'Only set_target_build changes something (the target build in the app). ' +
     'Nothing is sent to the game or the trade site; buying stays manual. The first call starts Path of Building and takes a few seconds.',
 };
 

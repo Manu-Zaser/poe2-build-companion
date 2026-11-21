@@ -191,9 +191,11 @@ export interface StoredState {
 
 export interface StoredTarget {
   code: string;
+  /** For source "link": the link it came from. */
+  link?: string;
   /** Shown name: the PoB file name, or class and level for a pasted code. */
   name: string;
-  source: 'paste' | 'file';
+  source: 'paste' | 'file' | 'link';
   /** ISO time it was set. */
   importedAt: string;
 }
@@ -201,7 +203,8 @@ export interface StoredTarget {
 /** Target build as the renderer and overlay get it. */
 export interface TargetView {
   name: string;
-  source: 'paste' | 'file';
+  link?: string;
+  source: 'paste' | 'file' | 'link';
   importedAt: string;
   build: import('./targets').TargetBuild;
 }

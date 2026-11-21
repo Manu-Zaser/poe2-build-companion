@@ -10,6 +10,8 @@ export interface Tool {
   title: string;
   description: string;
   inputSchema: { type: 'object'; properties: Record<string, unknown>; required?: string[]; additionalProperties?: boolean };
+  /** Changes something (default: only reads). */
+  writes?: boolean;
   /** Runs the tool; the result becomes JSON text. Throw an Error with a message for the user/AI on failure. */
   run(args: Record<string, unknown>): Promise<unknown>;
 }
@@ -60,7 +62,13 @@ export async function handleMessage(line: string, info: ServerInfo, tools: Tool[
       return reply(msg.id, {});
     case 'tools/list':
       return reply(msg.id, {
-        tools: tools.map(({ name, title, description, inputSchema }) => ({ name, title, description, inputSchema, annotations: { readOnlyHint: true, openWorldHint: false } })),
+        tools: tools.map(({ name, title, description, inputSchema, writes }) => ({
+          name,
+          title,
+          description,
+          inputSchema,
+          annotations: writes ? { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true } : { readOnlyHint: true, openWorldHint: false },
+        })),
       });
     case 'tools/call': {
       const name = msg.params?.name;
