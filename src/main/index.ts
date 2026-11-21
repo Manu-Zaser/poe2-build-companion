@@ -34,6 +34,7 @@ import { buildFromLink } from '../shared/targetlink';
 import { makeTarget, targetName } from '../shared/targetstore';
 import { judgeItem } from '../shared/verdict';
 import { Engine } from './engine';
+import { checkForUpdates, downloadUpdate, initUpdates, installUpdate, openReleasePage, updateState } from './updater';
 import { log } from './log';
 import { Overlay } from './overlay';
 import { findBuildsDir, listBuildFiles, readBuildFile, watchBuildFile } from './pobfile';
@@ -282,7 +283,7 @@ function setTarget(xml: string, name: string, source: 'paste' | 'file' | 'link',
 
 
 function view(): BuildView {
-  return { build: store.build, settings: store.settings, overview, engine: engineState, engineError, loadMs, hotkeyActive, target: targetView() };
+  return { build: store.build, settings: store.settings, overview, engine: engineState, engineError, loadMs, hotkeyActive, target: targetView(), update: updateState() };
 }
 
 let mainWin: BrowserWindow | null = null;
@@ -705,6 +706,11 @@ function registerIpc() {
     return ok();
   });
   ipcMain.handle('mcp:setup', () => mcpSetup());
+  // Updates über GitHub-Releases (wie Price Check): erst nach Bestätigung laden, beim Beenden installieren.
+  ipcMain.on('update:check', () => void checkForUpdates());
+  ipcMain.on('update:download', () => downloadUpdate());
+  ipcMain.on('update:install', () => installUpdate());
+  ipcMain.on('update:open', () => openReleasePage());
   ipcMain.handle('mcp:copy', (_e, what: unknown) => {
     const s = mcpSetup();
     clipboard.writeText(what === 'claudeCode' ? s.claudeCode : s.json);
@@ -951,6 +957,7 @@ if (!app.requestSingleInstanceLock()) {
     createMainWindow();
     overlay.create();
     void startEngine();
+    initUpdates({ userAgent: userAgent(), onChange: pushView });
     if (process.env.COMPANION_TEST) {
       // Invisible tests drive the item check directly – no global hotkey, never sending keys.
       (globalThis as Record<string, unknown>).__companionTest = { itemCheck, equipLast, startUpgradeSearch };

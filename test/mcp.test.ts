@@ -77,7 +77,7 @@ const overview: Overview = {
 
 describe('MCP tools: what the AI sees', () => {
   it('summarises the character with gear, gems and keystones', () => {
-    const c = characterSummary(overview, 'Path of Building file "ZaserRanger"');
+    const c = characterSummary(overview, 'Path of Building file "MyRanger"');
     expect(c).toMatchObject({ class: 'Ranger', ascendancy: 'Deadeye', level: 94, mainSkill: 'Ice Shot' });
     expect(c.gear).toEqual([{ slot: 'Helmet', name: 'Corpse Cowl', base: 'Ancestral Tiara', rarity: 'RARE', mods: ['+67 to maximum Energy Shield'] }]);
     expect(c.skills[0].gems).toEqual(['Ice Shot 20/20%', 'Fork (support) (off)']);

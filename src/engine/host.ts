@@ -39,7 +39,10 @@ const t0 = performance.now();
 process.chdir(path.join(pobDir, 'src'));
 const L = luaL_newstate();
 luaL_openlibs(L);
-if (luaL_loadfile(L, path.join(__dirname, 'bridge.lua')) !== 0 || lua_pcall(L, 0, 0, 0) !== 0) {
+// LuaJIT liest mit eigenen Dateifunktionen und kann nicht in das app.asar-Archiv der exe schauen –
+// bridge.lua liegt dort deshalb ausgepackt (asarUnpack) in app.asar.unpacked.
+const bridgeFile = path.join(__dirname.replace(/app\.asar(?=[\\/]|$)/, 'app.asar.unpacked'), 'bridge.lua');
+if (luaL_loadfile(L, bridgeFile) !== 0 || lua_pcall(L, 0, 0, 0) !== 0) {
   process.stdout.write(JSON.stringify({ fatal: `Path of Building failed to start: ${popString(L)}` }) + '\n');
   process.exit(1);
 }

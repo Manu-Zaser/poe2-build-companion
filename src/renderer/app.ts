@@ -504,6 +504,7 @@ for (const [btn, what] of [['mcp-copy-json', 'json'], ['mcp-copy-cc', 'claudeCod
 
 function render(v: BuildView) {
   renderMcp(v);
+  renderUpdate(v);
   if (v.build?.code !== current?.build?.code) shownSet = null;
   current = v;
   localSlots = new Set((v.build?.equips ?? []).map((e) => e.slot));
@@ -1072,3 +1073,104 @@ api.onView(render);
 void api.getView().then(render);
 // Keep the "x hours ago" texts current.
 setInterval(() => current?.overview && renderHeader(current, current.overview), 60_000);
+
+// ---------- Updates ----------
+
+function updateTexts(u: BuildView["update"]): { title: string; text: string; action: 'install' | 'download' | 'fetch' | null } | null {
+  switch (u.status) {
+    case 'ready':
+      return { title: `Update ${u.version} ready`, text: 'Installs when you quit the tool – or restart now.', action: 'install' };
+    case 'downloading':
+      return { title: `Downloading ${u.version}`, text: `${u.percent ?? 0} %`, action: null };
+    case 'available':
+      return u.selfUpdating
+        ? { title: `Version ${u.version} available`, text: 'Download it now – it installs when you quit the tool.', action: 'fetch' }
+        : { title: `Version ${u.version} available`, text: 'Download the new version from GitHub.', action: 'download' };
+    default:
+      return null;
+  }
+}
+
+function renderUpdate(v: BuildView) {
+  const u = v.update;
+  const info = updateTexts(u);
+  $('update-card').hidden = !info;
+  if (info) {
+    $('update-title').textContent = info.title;
+    $('update-text').textContent = info.text;
+    const action = $('update-action') as HTMLButtonElement;
+    action.hidden = !info.action;
+    action.textContent = info.action === 'install' ? 'Restart now' : info.action === 'fetch' ? 'Download' : 'Open download page';
+    action.dataset.action = info.action ?? '';
+    $('update-progress').hidden = u.status !== 'downloading';
+    ($('update-progress').firstElementChild as HTMLElement).style.width = `${u.percent ?? 0}%`;
+  }
+
+  $('version-out').textContent = `Version ${u.current}`;
+  const check = $('update-check') as HTMLButtonElement;
+  check.textContent = u.status === 'checking' ? 'Checking …' : u.status === 'none' ? 'Up to date' : u.status === 'error' ? 'Check failed – retry' : 'Check for updates';
+  check.title = u.selfUpdating
+    ? 'Checks at start and every 6 hours. A new version is downloaded after you confirm and installs when you quit the tool.'
+    : 'Portable version: new versions are announced here; download them from GitHub.';
+  check.disabled = u.status === 'checking' || u.status === 'downloading';
+  maybeAskUpdate(u);
+}
+
+// Rückfrage, sobald eine neue Version gefunden wird (beim Start, alle 6 h oder per "Check now").
+// "Later" merkt sich die Version – gefragt wird dann erst wieder bei "Check now" oder einer neueren.
+let updateDismissed: string | null = null;
+let manualCheck = false;
+let modalFor: string | null = null;
+
+function maybeAskUpdate(u: BuildView["update"]) {
+  if (u.status !== 'available' || !u.version) {
+    if (u.status !== 'checking') manualCheck = false;
+    closeUpdateModal();
+    return;
+  }
+  if (modalFor === u.version || (updateDismissed === u.version && !manualCheck)) return;
+  manualCheck = false;
+  modalFor = u.version;
+  $('update-modal-title').textContent = `Update ${u.version} available`;
+  $('update-modal-text').textContent = u.selfUpdating
+    ? `You have ${u.current}. Download the new version now? It installs when you quit the tool – or right away with "Restart now".`
+    : `You have ${u.current}. This is the portable version – open the download page for the new version?`;
+  $('update-confirm').textContent = u.selfUpdating ? 'Download' : 'Open download page';
+  $('update-modal').hidden = false;
+  $('update-confirm').focus();
+}
+
+function closeUpdateModal() {
+  $('update-modal').hidden = true;
+  modalFor = null;
+}
+
+function runUpdateAction(action: string | undefined) {
+  if (action === 'install') api.installUpdate();
+  else if (action === 'fetch') api.downloadUpdate();
+  else if (action === 'download') api.openReleasePage();
+}
+
+$('update-check').addEventListener('click', () => {
+  manualCheck = true;
+  updateDismissed = null;
+  // Schon gefunden: gleich wieder fragen, statt erneut nachzusehen.
+  if (current?.update.status === 'available') maybeAskUpdate(current.update);
+  else api.checkUpdates();
+});
+$('update-action').addEventListener('click', (e) => runUpdateAction((e.currentTarget as HTMLElement).dataset.action));
+$('update-confirm').addEventListener('click', () => {
+  const version = modalFor;
+  runUpdateAction(current?.update.selfUpdating ? 'fetch' : 'download');
+  closeUpdateModal();
+  updateDismissed = version;
+});
+$('update-later').addEventListener('click', () => {
+  const version = modalFor;
+  closeUpdateModal();
+  updateDismissed = version;
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('update-modal').hidden) $('update-later').click();
+});
+

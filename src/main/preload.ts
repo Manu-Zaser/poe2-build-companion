@@ -13,6 +13,11 @@ const api = {
   pasteBuild: (): Promise<Result> => ipcRenderer.invoke('build:paste'),
   /** Copies the current build code to the clipboard. */
   copyBuild: (): Promise<boolean> => ipcRenderer.invoke('build:copy'),
+  /** Updates (GitHub releases): check, download after confirmation, restart to install, or the download page (portable). */
+  checkUpdates: () => ipcRenderer.send('update:check'),
+  downloadUpdate: () => ipcRenderer.send('update:download'),
+  installUpdate: () => ipcRenderer.send('update:install'),
+  openReleasePage: () => ipcRenderer.send('update:open'),
   /** Optional AI connection (MCP): on/off, setup for AI programs, copy it to the clipboard (on click). */
   setMcp: (on: boolean): Promise<Result> => ipcRenderer.invoke('mcp:set', on),
   mcpSetup: (): Promise<import('../shared/types').McpSetup> => ipcRenderer.invoke('mcp:setup'),

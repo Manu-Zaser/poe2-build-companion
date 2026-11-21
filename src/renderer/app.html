@@ -55,11 +55,18 @@
     </nav>
 
     <div class="sidebar-foot">
+      <div class="update-card" id="update-card" hidden>
+        <span class="update-title" id="update-title"></span>
+        <span class="update-text" id="update-text"></span>
+        <div class="progress" id="update-progress" hidden><i></i></div>
+        <button class="btn primary sm" id="update-action" hidden></button>
+      </div>
       <div class="engine-state" id="engine-state"><i></i><span>Starting Path of Building…</span></div>
       <p class="fineprint">
         Calculations by Path of Building (MIT). Values are PoB calculations, not measurements in game.
         Not affiliated with or endorsed by Grinding Gear Games.
       </p>
+      <p class="fineprint version-line"><span id="version-out"></span> · <button class="link-btn" id="update-check">Check for updates</button></p>
     </div>
   </aside>
 
@@ -426,6 +433,18 @@
       </section>
     </main>
   </div>
+  <!-- Rückfrage: Update gefunden -->
+  <div class="modal-backdrop" id="update-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
+      <h3 id="update-modal-title">Update available</h3>
+      <p id="update-modal-text"></p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="update-later">Later</button>
+        <button class="btn primary" id="update-confirm">Download</button>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

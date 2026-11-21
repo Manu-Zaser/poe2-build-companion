@@ -220,6 +220,21 @@ export interface BuildView {
   /** false if another program already uses the hotkey. */
   hotkeyActive: boolean;
   target?: TargetView;
+  update: UpdateState;
+}
+
+export interface UpdateState {
+  status: 'idle' | 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error';
+  /** Running version. */
+  current: string;
+  /** New version (available / downloading / ready). */
+  version?: string;
+  /** Download progress in % (installed version). */
+  percent?: number;
+  error?: string;
+  checkedAt?: number;
+  /** true = installed version, updates itself; false = portable exe (notice + download page). */
+  selfUpdating: boolean;
 }
 
 /** A build file saved by Path of Building 2, as listed on the Build source page. */

@@ -3,11 +3,54 @@
 Desktop tool for Path of Exile 2 that knows your character and the build you follow, and answers one question
 for an item you just found: *is it better than what I wear, and does it fit my build?*
 
-Status: **Phase 3 (target build) – done.** Phases 0–3 of the concept are complete; next: a distributable exe.
+<p align="center">
+  <img src="docs/images/character.png" width="760" alt="Character page: equipment, jewels, skills and the stats Path of Building calculates, with warnings such as resistances below the cap">
+</p>
 
 > This product isn't affiliated with or endorsed by Grinding Gear Games in any way.
 > Uses [Path of Building PoE2](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2) (MIT, © David Gowor)
-> as its calculation engine, unchanged, as a git submodule.
+> as its calculation engine, unchanged.
+
+## Download
+
+From the [latest release](https://github.com/Manu-Zaser/poe2-build-companion/releases/latest), pick one:
+
+| File | |
+|---|---|
+| **`PoE2-Build-Companion-Setup-<version>.exe`** (recommended) | Installs for your Windows user (no admin rights) and **updates itself**: it checks for a new version at start and every 6 hours (or with "Check for updates" at the bottom of the sidebar), asks before downloading it, and installs it when you close the app – or right away with "Restart now". |
+| `PoE2-Build-Companion-<version>.exe` | Portable, no installation. Cannot replace itself – the app tells you when a new version is available and opens the download page. |
+
+- Path of Building PoE2 is included – nothing else to install.
+- Settings and your build are stored in `%APPDATA%\PoE2 Build Companion` on your computer only.
+- The exe files are not signed: on first launch Windows shows "Windows protected your PC" → "More info" → "Run anyway".
+- Update checks only ask github.com for the latest release – no data is sent. Nothing is downloaded without your OK.
+- Play PoE2 in windowed or windowed fullscreen mode, so the overlay can show on top.
+
+## How to use
+
+The app has a **How to use** page with the steps; in short:
+
+1. **Load your character** (*Build source*): import it in Path of Building 2 and save – the app reloads it on every
+   save. Or link your public poe.ninja profile, or paste a PoB code.
+2. **See where your build stands** (*Character*).
+3. **Check items you find**: hover over an item in game and press **Alt+D** – better, worse or a trade-off, with
+   warnings first.
+4. **Find upgrades** within a budget (*Upgrades*).
+5. Optional: **follow a guide** (*Target build*) and **ask an AI assistant** (*AI connection*).
+
+<p align="center">
+  <img src="docs/images/item-check.png" width="320" alt="Item check overlay: a ring compared in both ring slots, with DPS and effective HP change and a resistance warning">
+  &nbsp;
+  <img src="docs/images/upgrades.png" width="520" alt="Upgrades page: budget, weighting and slots, and trade listings calculated in the build">
+</p>
+
+<p align="center">
+  <img src="docs/images/target-build.png" width="520" alt="Target build page: the build you follow, and per slot which target stats your gear has">
+  &nbsp;
+  <img src="docs/images/how-to-use.png" width="520" alt="How to use page with six steps">
+</p>
+
+The screenshots use a demo build from the tests; the upgrade listings in them are made up.
 
 ## Pages
 
@@ -82,7 +125,7 @@ build in use; a running app takes such changes over right away.
 The build is the one loaded in the app – the watched PoB file is read fresh on every call, so a save in PoB is seen
 right away.
 
-## Target build (phase 3)
+## Target build
 
 On the *Target build* page, set the build you follow – paste its Path of Building code (e.g. from a guide), use a
 build saved in Path of Building 2, or paste a **link**: pobb.in, pastebin, a poe.ninja character, or a guide page that
@@ -98,7 +141,7 @@ resistances …; a unique: that unique).
   "+x% to all Elemental Resistances" covers a single elemental resistance. Filler stats (item rarity, light radius,
   stun threshold, on-kill effects …) are shown in grey and do not count.
 
-## Item check (phase 2)
+## Item check
 
 Hover over an item in game and press the hotkey (default **Alt+D**, changeable on the *Item check* page). The
 overlay answers within a fraction of a second:
@@ -119,7 +162,7 @@ overlay answers within a fraction of a second:
 
 The overlay stays open until you close it (× or Esc), can be dragged from anywhere and remembers its position.
 
-## Character page (phase 1)
+## Character page
 
 The character page is laid out like a character profile on poe.ninja:
 
@@ -180,6 +223,11 @@ npx electron scripts/run-hidden.cjs scripts/target-ui.cjs <output folder>    # t
 npx electron scripts/run-hidden.cjs scripts/file-ui.cjs <output folder>      # PoB file source (own test folder)
 npx electron scripts/run-hidden.cjs scripts/upgrades-ui.cjs <output folder>  # upgrades page (offline; UP_LIVE=1 searches the trade site)
 ```
+
+`npm run dist` builds the installer and the portable exe into `release/` (Path of Building is bundled from the
+submodule, without the passive tree pictures the engine does not need). Releases are built by GitHub Actions when a
+tag `v<version>` is pushed and published by hand; `scripts/readme-images.cjs` makes the README screenshots from the
+demo build.
 
 The tests never register the global hotkey and never send keys; the item check is called with fixture texts.
 

@@ -11,24 +11,100 @@
     "start": "node build.mjs && electron .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "engine-check": "node build.mjs && node scripts/engine-check.mjs"
+    "engine-check": "node build.mjs && node scripts/engine-check.mjs",
+    "dist": "node build.mjs && electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
     "@poe2/core": "file:../core",
     "@types/node": "^26.6.6",
     "electron": "^45.3.3",
+    "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   },
   "dependencies": {
+    "electron-updater": "^6.8.11",
     "koffi": "^3.3.8"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
     "koffi@3.3.8": true,
-    "electron": true
+    "electron": true,
+    "electron-winstaller": false
   },
   "productName": "PoE2 Build Companion",
-  "author": "Manu-Zaser"
+  "author": "Manu-Zaser",
+  "build": {
+    "appId": "local.poe2.buildcompanion",
+    "productName": "PoE2 Build Companion",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "!dist/**/*.map",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/koffi/**",
+      "dist/bridge.lua"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/PathOfBuilding-PoE2",
+        "to": "pob",
+        "filter": [
+          "src/**/*",
+          "runtime/**/*",
+          "LICENSE.md",
+          "!src/TreeData/**/*.png",
+          "!src/TreeData/**/*.jpg",
+          "!src/TreeData/**/*.zst",
+          "!**/.git*",
+          "!**/*.md"
+        ]
+      },
+      {
+        "from": "vendor/PathOfBuilding-PoE2/LICENSE.md",
+        "to": "pob/LICENSE.md"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "PoE2-Build-Companion-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "PoE2-Build-Companion-Setup-${version}.${ext}",
+      "shortcutName": "PoE2 Build Companion",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Manu-Zaser",
+        "repo": "poe2-build-companion",
+        "releaseType": "release"
+      }
+    ]
+  }
 }
