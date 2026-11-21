@@ -5,6 +5,7 @@ import { decodeBuildCode, encodeBuildCode, MAX_CODE_LENGTH, normalizeBuildCode }
 import { readItemText as readGameItemText } from '@poe2/core/clipboard';
 import { validateHotkey } from '@poe2/core/hotkey';
 import { foregroundWindowHandle } from '@poe2/core/win32';
+import { keepWindowFrameClean } from '@poe2/core/window';
 import { characterLink, fetchNinjaBuild, fetchNinjaIcons, parseCharacterLink } from '../shared/ninja';
 import type { McpSetup,
   BuildSource,
@@ -841,6 +842,8 @@ function createMainWindow() {
     webPreferences: { preload: join(__dirname, 'preload.js') },
   });
   mainWin.removeMenu();
+  // Kein weißer Rand nach dem Wechsel auf einen Bildschirm mit anderer Skalierung; dunkler Fensterrand.
+  keepWindowFrameClean(mainWin, { frameColor: '#100e0c' });
   void mainWin.loadFile(join(__dirname, 'app.html'));
   mainWin.once('ready-to-show', () => mainWin?.show());
   mainWin.on('closed', () => {
