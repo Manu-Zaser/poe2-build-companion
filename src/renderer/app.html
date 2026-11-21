@@ -26,14 +26,6 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5" /><path d="M5 20c.8-4 3.6-6 7-6s6.2 2 7 6" /></svg>
         <span>Character</span>
       </button>
-      <button class="nav-item" data-page="source">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5" /></svg>
-        <span>Build source</span>
-      </button>
-      <button class="nav-item" data-page="target">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="0.8" /></svg>
-        <span>Target build</span>
-      </button>
       <button class="nav-item" data-page="check">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="11" rx="2" /><path d="M7 11h2M11 11h2M15 11h2M8 14.5h8" /></svg>
         <span>Item check</span>
@@ -42,9 +34,23 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" /><path d="M5 20h14" /></svg>
         <span>Upgrades</span>
       </button>
+      <button class="nav-item" data-page="target">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="0.8" /></svg>
+        <span>Target build</span>
+      </button>
+      <span class="nav-label">Setup</span>
+      <button class="nav-item" data-page="source">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5" /></svg>
+        <span>Build source</span>
+      </button>
       <button class="nav-item" data-page="ai">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v3M15 4v3M9 17v3M15 17v3M4 9h3M4 15h3M17 9h3M17 15h3" /><rect x="7" y="7" width="10" height="10" rx="2" /><path d="M10.5 10.5h3v3h-3z" /></svg>
         <span>AI connection</span>
+      </button>
+      <span class="nav-label">Help</span>
+      <button class="nav-item" data-page="guide">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h5.5a2 2 0 0 1 2 2V20a1.5 1.5 0 0 0-1.5-1.5H5zM19 4.5h-5.5a2 2 0 0 0-2 2V20a1.5 1.5 0 0 1 1.5-1.5H19z" /></svg>
+        <span>How to use</span>
       </button>
     </nav>
 
@@ -70,6 +76,10 @@
 
       <!-- CHARACTER -->
       <section class="page active" data-page="character" data-title="Character" data-sub="Your gear, defences and damage at a glance">
+        <div class="card pad empty-state" id="starting" hidden>
+          <h2>Starting Path of Building…</h2>
+          <p>The calculations run in Path of Building, which takes a few seconds to start. Your build appears here right after.</p>
+        </div>
         <div class="card pad empty-state" id="empty" hidden>
           <h2>No build loaded yet</h2>
           <p>Choose the build you save in <b>Path of Building 2</b> – it reloads on every save. Or link your character on poe.ninja, or paste a Path of Building code.</p>
@@ -77,6 +87,7 @@
             <button class="btn primary" data-goto="source">Set up build source</button>
             <button class="btn" id="empty-paste">Paste build code</button>
           </div>
+          <p class="section-hint">New here? <button class="link-btn" data-goto="guide">How to use →</button></p>
         </div>
 
         <div id="char" hidden>
@@ -146,7 +157,7 @@
       <!-- BUILD SOURCE -->
       <section class="page" data-page="source" data-title="Build source" data-sub="Where your character comes from">
         <div class="card pad">
-          <div class="card-head"><h2>Path of Building 2 file</h2><span class="badge">always up to date</span></div>
+          <div class="card-head"><h2>Path of Building 2 file <span class="badge on" id="src-use-file" hidden>in use</span></h2><span class="badge">recommended · always up to date</span></div>
           <p class="text">
             In Path of Building 2 click <b>Items and Skills</b> or <b>Passive Tree and Jewels</b> to import your character,
             then save with <b>Ctrl+S</b>. Choose the build here once – every save in PoB reloads it automatically.
@@ -162,7 +173,7 @@
         </div>
 
         <div class="card pad">
-          <div class="card-head"><h2>poe.ninja</h2></div>
+          <div class="card-head"><h2>poe.ninja <span class="badge on" id="src-use-ninja" hidden>in use</span></h2></div>
           <p class="text">
             If your profile is public, poe.ninja lists your character together with its Path of Building code.
             Open your character on <b>poe.ninja → Builds</b>, copy the address from the browser and paste it here.
@@ -190,7 +201,7 @@
         </div>
 
         <div class="card pad">
-          <div class="card-head"><h2>Path of Building code</h2></div>
+          <div class="card-head"><h2>Path of Building code <span class="badge on" id="src-use-paste" hidden>in use</span></h2></div>
           <p class="text">
             Works always, also with a private profile: in Path of Building 2 import your character
             (<b>Import/Export Build → Import from Path of Exile</b>), then <b>Export → Generate → Copy</b> and click here.
@@ -199,6 +210,62 @@
           <div class="row"><button class="btn" id="source-paste">Paste build code</button></div>
         </div>
       </section>
+      <!-- ANLEITUNG -->
+      <section class="page guide" data-page="guide" data-title="How to use" data-sub="From your character to the next upgrade">
+        <ol class="guide-steps">
+          <li class="step">
+            <span class="step-no">1</span>
+            <div>
+              <h3>Load your character</h3>
+              <p>Under <button class="link-btn" data-goto="source">Build source</button>: in Path of Building 2 import your character and save it (<b>Ctrl+S</b>), then pick that build once – <b>every save in PoB reloads it here</b>. Alternatives: your public poe.ninja profile, or a pasted PoB code.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-no">2</span>
+            <div>
+              <h3>See where your build stands</h3>
+              <p><button class="link-btn" data-goto="character">Character</button> shows your gear, skills, defences and damage as Path of Building calculates them. Red boxes are things to fix first, e.g. <b>resistances below the cap</b>.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-no">3</span>
+            <div>
+              <h3>Check items you find</h3>
+              <p>In game, hover over an item and press <span class="inline-keys" id="guide-keys"></span>. The overlay answers <b>better, worse or trade-off</b> with the change in damage, effective HP, life and resistances – warnings first. Rings are checked in both slots. <b>Equip in my build</b> keeps the item in your build here until the next import.</p>
+              <p>Each press sends exactly one copy command to the game – nothing else.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-no">4</span>
+            <div>
+              <h3>Find upgrades for your budget</h3>
+              <p>Under <button class="link-btn" data-goto="upgrades">Upgrades</button> set a budget per item, how much damage vs. defence counts, and the slots – then <b>Find upgrades</b>. The trade site is searched anonymously and every listing is calculated in your build. Click a listing to open it on the trade site; <b>buying stays with you</b>.</p>
+              <p>The trade site allows only a few searches per minute – after a big run, wait a few minutes before the next.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-no">5</span>
+            <div>
+              <h3>Follow a guide (optional)</h3>
+              <p>Under <button class="link-btn" data-goto="target">Target build</button> paste the guide's PoB code or a link (pobb.in, poe.ninja …). Each slot becomes a short list of target stats; the item check then also says "Fits your build: 3 of 4", and the page shows what your gear still misses.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-no">6</span>
+            <div>
+              <h3>Ask an AI assistant (optional)</h3>
+              <p>Under <button class="link-btn" data-goto="ai">AI connection</button> you can let Claude, OpenAI Codex, Gemini CLI and others read your build and ask Path of Building about items – off by default.</p>
+            </div>
+          </li>
+        </ol>
+        <h2 class="guide-h">Good to know</h2>
+        <ul class="tips">
+          <li>All numbers are <b>Path of Building calculations</b>, not measurements in game – conditional effects can differ.</li>
+          <li>Play PoE2 in <b>windowed</b> or <b>windowed fullscreen</b> mode, otherwise the overlay ends up behind the game.</li>
+          <li>No login, no game memory read, nothing injected; the trade site is only searched when you click.</li>
+        </ul>
+      </section>
+
       <!-- KI-VERBINDUNG (optional) -->
       <section class="page" data-page="ai" data-title="AI connection" data-sub="Optional: let an AI assistant read your build (MCP)">
         <div class="card pad">
@@ -286,13 +353,9 @@
         </div>
 
         <div class="card pad">
-          <div class="card-head"><h2>How it works</h2></div>
-          <ol class="steps">
-            <li><b>Hover over an item in game</b> and press the hotkey. The item is copied once and checked against your build in Path of Building.</li>
-            <li><b>The overlay answers:</b> better, worse or a trade-off, with the change in DPS of your main skill, effective HP, life and resistances – and warnings first, e.g. when a resistance falls below the cap or an attribute requirement is no longer met. Rings are checked in both slots.</li>
-            <li><b>Equip in my build</b> puts the item into the local copy of your build, without a new import. The character page shows how many items were changed since the last import.</li>
-          </ol>
-          <p class="section-hint">The overlay stays open until you close it (× or Esc). Drag it anywhere – it remembers the position. <button class="link-btn" id="overlay-reset">Reset position</button></p>
+          <div class="card-head"><h2>In game</h2></div>
+          <p class="text">Hover over an item and press the hotkey – the overlay says whether it is <b>better, worse or a trade-off</b> for your build, with warnings first (resistance below the cap, attribute missing …). <button class="link-btn" data-goto="guide">Details in How to use →</button></p>
+          <p class="section-hint">Drag the overlay anywhere – it remembers the position. <button class="link-btn" id="overlay-reset">Reset position</button></p>
         </div>
       </section>
       <!-- UPGRADES -->

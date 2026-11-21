@@ -9,6 +9,13 @@ Status: **Phase 3 (target build) – done.** Phases 0–3 of the concept are com
 > Uses [Path of Building PoE2](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2) (MIT, © David Gowor)
 > as its calculation engine, unchanged, as a git submodule.
 
+## Pages
+
+The sidebar puts the everyday pages first – **Character**, **Item check**, **Upgrades**, **Target build** – then the
+setup (**Build source**, **AI connection**) and **How to use**, a step-by-step guide from loading the character to
+the next upgrade. While Path of Building starts, the character page says so instead of staying empty; the build source
+in use is marked.
+
 ## Upgrades
 
 On the *Upgrades* page, set a budget per item (Divine or Exalted), how much damage vs. defence counts, and the slots

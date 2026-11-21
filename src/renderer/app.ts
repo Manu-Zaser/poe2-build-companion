@@ -431,6 +431,10 @@ function renderHeader(v: BuildView, ov: Overview) {
 // ---------- Item check page ----------
 
 function renderHotkey(v: BuildView) {
+  // Anleitung: aktueller Hotkey als kleine Tastenkappen.
+  $('guide-keys').replaceChildren(
+    ...formatHotkey(v.settings.hotkey).flatMap((k, i) => [i ? el('span', 'plus', '+') : '', el('kbd', 'key sm', k)]).filter((x): x is HTMLElement => x !== ''),
+  );
   if (recording) return;
   $('hk-keys').className = 'hk-keys';
   $('hk-keys').replaceChildren(
@@ -513,6 +517,12 @@ function render(v: BuildView) {
 
   const ov = v.overview;
   $('empty').hidden = !!v.build || v.engine === 'starting';
+  // Solange PoB startet (oder rechnet), statt einer leeren Seite ein kurzer Hinweis.
+  $('starting').hidden = !!ov || v.engine === 'failed' || (v.engine === 'ready' && !v.build);
+  const kind = v.build?.source.kind;
+  $('src-use-file').hidden = kind !== 'file';
+  $('src-use-ninja').hidden = kind !== 'ninja';
+  $('src-use-paste').hidden = kind !== 'paste';
   $('char').hidden = !ov;
 
   renderUpgradeSlots(v);
