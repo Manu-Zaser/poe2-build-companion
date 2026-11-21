@@ -165,6 +165,32 @@ function saveStore() {
 }
 
 /**
+ * The AI assistant (MCP server) switched the build or equipped an item: load it like the app would.
+ */
+async function takeOverBuild(disk: StoredBuild | undefined) {
+  const cur = store.build;
+  if (!disk || !cur) return;
+  const same = (a: StoredBuild, b: StoredBuild) => JSON.stringify({ c: a.code, s: a.source }) === JSON.stringify({ c: b.code, s: b.source });
+  try {
+    if (!same(disk, cur)) {
+      if (disk.source.kind === 'file') {
+        const res = await loadFromFile(disk.source.path);
+        if (res.ok) notify(`Your AI assistant switched to the build "${disk.source.name}".`);
+      }
+      return;
+    }
+    if (JSON.stringify(disk.equips ?? []) === JSON.stringify(cur.equips ?? [])) return;
+    cur.equips = disk.equips;
+    overview = await calculate(cur.code, cur.equips);
+    pushView();
+    const last = disk.equips?.at(-1);
+    if (last) notify(`Your AI assistant equipped ${last.name} in ${last.slot}.`);
+  } catch (err) {
+    log(`change from the AI connection could not be loaded: ${message(err)}`);
+  }
+}
+
+/**
  * The MCP server (started by an AI assistant) may set the target build in the same file. Take over such a
  * change right away, so the next save of the app does not undo it. Once a second – a tiny file.
  */
@@ -179,14 +205,16 @@ function watchStoreFile() {
     if (text === lastWritten) return;
     try {
       const disk = JSON.parse(text) as Partial<StoredState>;
-      const target = sanitizeTarget(disk.target);
-      if (JSON.stringify(target) === JSON.stringify(store.target)) return;
-      store.target = target;
-      targetCache = null;
       lastWritten = text;
-      log(`target build changed outside the app (${target ? target.name : 'removed'})`);
-      pushView();
-      if (target) notify(`Your AI assistant set the target build: ${target.name}`);
+      const target = sanitizeTarget(disk.target);
+      if (JSON.stringify(target) !== JSON.stringify(store.target)) {
+        store.target = target;
+        targetCache = null;
+        log(`target build changed outside the app (${target ? target.name : 'removed'})`);
+        pushView();
+        if (target) notify(`Your AI assistant set the target build: ${target.name}`);
+      }
+      void takeOverBuild(sanitizeBuild(disk.build));
     } catch {
       // halb geschrieben – beim nächsten Mal
     }
@@ -452,6 +480,14 @@ async function itemCheck(textOverride?: string) {
       return;
     }
     lastItemText = text;
+    // Für die KI-Verbindung (get_last_item_check): nur der Itemtext und die Zeit, nur auf diesem PC.
+    if (store.settings.mcp) {
+      try {
+        writeFileSync(join(app.getPath('userData'), 'last-item.json'), JSON.stringify({ text, at: new Date().toISOString() }));
+      } catch {
+        // nicht wichtig
+      }
+    }
     const verdicts = judgeItem(result.before, result.slots);
     // "Does it fit my build?" – checked against the target build, if one is set.
     const target = targetBuild();

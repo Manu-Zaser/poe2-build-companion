@@ -93,3 +93,72 @@ export function comparisonSummary(c: Comparison) {
     })),
   };
 }
+
+const DEFENCE = /Resist|^Life|EnergyShield|Evasion|Evade|Deflect|Armour|Block|Ward|MaximumHitTaken|EHP|Regen|Leech|Recharge|DamageReduction|^Mana|Spirit|MovementSpeed/;
+
+/** All defensive and recovery numbers PoB calculated, rounded. */
+export function defenceSummary(o: Overview) {
+  const stats = pickStats(o.stats, Object.keys(o.stats).filter((k) => DEFENCE.test(k)).sort());
+  const res = ['Fire', 'Cold', 'Lightning', 'Chaos'].map((e) => ({ element: e, resist: stats[`${e}Resist`] ?? null, maxHit: stats[`${e}MaximumHitTaken`] ?? null }));
+  return { resistances: res, stats };
+}
+
+/** One skill: all of PoB's numbers for it and the gems in its group. Without a name: the main skill. */
+export function skillDetails(o: Overview, name?: string) {
+  const q = (name ?? '').trim().toLowerCase();
+  const skill = q ? o.skills.find((s) => s.name.toLowerCase() === q) ?? o.skills.find((s) => s.name.toLowerCase().includes(q)) : o.skills.find((s) => s.main) ?? o.skills[0];
+  if (!skill) throw new Error(q ? `No damaging skill called "${name}" in this build. Skills: ${o.skills.map((s) => s.name).join(', ')}.` : 'No damaging skills in this build.');
+  const group = o.gemGroups.find((g) => g.index === skill.group);
+  return {
+    name: skill.part ? `${skill.name} (${skill.part})` : skill.name,
+    main: !!skill.main,
+    dps: Math.round(skill.dps),
+    stats: pickStats(skill.stats, Object.keys(skill.stats).sort()),
+    gems: group ? group.gems.map((g) => `${g.name}${g.level ? ` ${g.level}` : ''}${g.quality ? `/${g.quality}%` : ''}${g.support ? ' (support)' : ''}${g.enabled ? '' : ' (off)'}`) : [],
+    otherSkills: o.skills.filter((s) => s !== skill).map((s) => s.name),
+  };
+}
+
+/** Before/after of a what-if or an equip: changes in % for damage and EHP, plus the stats that moved. */
+export function changeSummary(before: Stats, after: Stats) {
+  const pct = (a?: number, b?: number) => (a && b !== undefined && Number.isFinite(a) && a !== 0 ? Math.round(((b - a) / Math.abs(a)) * 1000) / 10 : null);
+  const changes: Record<string, { before: number; after: number }> = {};
+  for (const k of Object.keys(after)) {
+    const a = before[k];
+    const b = after[k];
+    if (typeof a === 'number' && typeof b === 'number' && Math.abs(b - a) > 1e-9) changes[k] = { before: round(a), after: round(b) };
+  }
+  return {
+    dpsChangePct: pct(before.CombinedDPS ?? before.TotalDPS, after.CombinedDPS ?? after.TotalDPS),
+    ehpChangePct: pct(before.TotalEHP, after.TotalEHP),
+    changes,
+  };
+}
+
+/** Trade listing in the shape the AI gets. */
+export function candidateSummary(c: {
+  item: { title?: string; name: string; base: string };
+  price: { amount: number; currency: string } | null;
+  dpsPct?: number | null;
+  ehpPct?: number | null;
+  gain: number;
+  upgrade: boolean;
+  blocking: string[];
+  warnings: string[];
+  listedAt?: string;
+  tradeUrl?: string;
+}) {
+  return {
+    name: c.item.title ?? c.item.name,
+    base: c.item.base,
+    price: c.price ? `${c.price.amount} ${c.price.currency}` : null,
+    dpsChangePct: typeof c.dpsPct === 'number' ? Math.round(c.dpsPct * 10) / 10 : null,
+    ehpChangePct: typeof c.ehpPct === 'number' ? Math.round(c.ehpPct * 10) / 10 : null,
+    overallPct: Math.round(c.gain * 10) / 10,
+    upgrade: c.upgrade,
+    ...(c.blocking.length ? { problems: c.blocking } : {}),
+    ...(c.warnings.length ? { warnings: c.warnings } : {}),
+    ...(c.listedAt ? { listed: c.listedAt } : {}),
+    ...(c.tradeUrl ? { tradeLink: c.tradeUrl } : {}),
+  };
+}

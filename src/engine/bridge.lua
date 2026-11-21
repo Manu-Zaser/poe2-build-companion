@@ -366,6 +366,50 @@ function handlers.compare(req)
 	return { item = describeItem(item), slots = results, before = before }
 end
 
+-- "What if": adds mod lines as PoB custom modifiers (like PoB's Config tab), recalculates, removes them
+-- again. The build itself stays as it was. Lines PoB does not understand are returned, not applied.
+function handlers.whatIf(req)
+	local configTab = build.configTab
+	local set = configTab.configSets[configTab.activeConfigSetId]
+	set.customModsList = set.customModsList or {}
+	local lines, unknown = {}, {}
+	for _, line in ipairs(req.mods or {}) do
+		local stripped = tostring(line):match("^%s*(.-)%s*$")
+		if stripped ~= "" then
+			local mods, extra = modLib.parseMod(stripped)
+			if mods and #mods > 0 and not extra then
+				lines[#lines + 1] = stripped
+			else
+				unknown[#unknown + 1] = stripped
+			end
+		end
+	end
+	local before = pickStats(build.calcsTab.mainOutput)
+	local after = before
+	if #lines > 0 then
+		local block = { title = "Build Companion what-if", enabled = true, text = table.concat(lines, "\n") }
+		table.insert(set.customModsList, block)
+		local ok, err = pcall(function()
+			configTab:BuildModList()
+			build.buildFlag = true
+			runCallback("OnFrame")
+			after = pickStats(build.calcsTab.mainOutput)
+		end)
+		for i = #set.customModsList, 1, -1 do
+			if set.customModsList[i] == block then
+				table.remove(set.customModsList, i)
+			end
+		end
+		configTab:BuildModList()
+		build.buildFlag = true
+		runCallback("OnFrame")
+		if not ok then
+			error(err, 0)
+		end
+	end
+	return { applied = lines, unknown = unknown, before = before, after = after }
+end
+
 -- Upgrade search, step 2: puts each candidate (PoB item text built from a trade listing) into ONE slot
 -- and recalculates. The build itself is never modified. A candidate that fails to parse or does not fit
 -- the slot gets an error instead of numbers.

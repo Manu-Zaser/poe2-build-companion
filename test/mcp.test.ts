@@ -100,3 +100,33 @@ describe('MCP tools: what the AI sees', () => {
     expect(comparisonSummary(c).slots[0]).toEqual({ slot: 'Ring 2', replaces: 'Armageddon Hold', dpsChangePct: 4, ehpChangePct: 4.5, changes: { CombinedDPS: 40, TotalEHP: 900, LightningResist: 3 } });
   });
 });
+
+describe('MCP tools: details, what-if, listings', () => {
+  it('lists defences per element and keeps only defensive stats', async () => {
+    const { defenceSummary } = await import('../src/mcp/tools');
+    const d = defenceSummary({ ...overview, stats: { ...overview.stats, ChaosResist: 0, ChaosMaximumHitTaken: 2532, CombinedDPS: 5 } });
+    expect(d.resistances.find((r) => r.element === 'Chaos')).toEqual({ element: 'Chaos', resist: 0, maxHit: 2532 });
+    expect(d.stats.CombinedDPS).toBeUndefined();
+    expect(d.stats.Life).toBe(1457);
+  });
+
+  it('finds a skill by name or falls back to the main skill', async () => {
+    const { skillDetails } = await import('../src/mcp/tools');
+    expect(skillDetails(overview).name).toBe('Ice Shot');
+    expect(skillDetails(overview, 'tornado')).toMatchObject({ name: 'Tornado Shot', dps: 222222, main: false });
+    expect(skillDetails(overview).gems).toEqual(['Ice Shot 20/20%', 'Fork (support) (off)']);
+    expect(() => skillDetails(overview, 'Spark')).toThrow(/No damaging skill called "Spark".*Ice Shot, Tornado Shot/);
+  });
+
+  it('turns before/after into changes in %', async () => {
+    const { changeSummary } = await import('../src/mcp/tools');
+    const c = changeSummary({ CombinedDPS: 1000, TotalEHP: 20000, ChaosResist: 0, Life: 1457 }, { CombinedDPS: 1000, TotalEHP: 23000, ChaosResist: 30, Life: 1457 });
+    expect(c).toEqual({ dpsChangePct: 0, ehpChangePct: 15, changes: { TotalEHP: { before: 20000, after: 23000 }, ChaosResist: { before: 0, after: 30 } } });
+  });
+
+  it('shapes a trade listing with price, gain and link', async () => {
+    const { candidateSummary } = await import('../src/mcp/tools');
+    const s = candidateSummary({ item: { title: 'Glyph Torc', name: 'Glyph Torc, Lapis Amulet', base: 'Lapis Amulet' }, price: { amount: 40, currency: 'divine' }, dpsPct: 16.2, ehpPct: 9.4, gain: 12.84, upgrade: true, blocking: [], warnings: ['x'], listedAt: '2026-09-01', tradeUrl: 'https://www.pathofexile.com/trade2/search/poe2/x' });
+    expect(s).toEqual({ name: 'Glyph Torc', base: 'Lapis Amulet', price: '40 divine', dpsChangePct: 16.2, ehpChangePct: 9.4, overallPct: 12.8, upgrade: true, warnings: ['x'], listed: '2026-09-01', tradeLink: 'https://www.pathofexile.com/trade2/search/poe2/x' });
+  });
+});

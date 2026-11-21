@@ -60,7 +60,8 @@ that speaks MCP) can read the build and let Path of Building calculate items. **
 The page shows the entry to add to the AI program (`mcpServers` JSON and a `claude mcp add …` line) with Copy buttons.
 The AI program starts the server itself: this app's exe in Node mode (`ELECTRON_RUN_AS_NODE=1`) with `dist/mcp.js` –
 the app does not need to be open. Local only (stdio, no network port), no login; nothing is sent to the game or the
-trade site. The only thing an assistant can change is the target build (a running app takes it over right away).
+trade site. An assistant can change only things in the app – the target build, items equipped there, the saved PoB
+build in use; a running app takes such changes over right away.
 
 | Tool | Returns |
 |---|---|
@@ -69,6 +70,14 @@ trade site. The only thing an assistant can change is the target build (a runnin
 | `evaluate_item` | For an item text: DPS and EHP change in % per slot it fits, and the changed stats |
 | `get_target` | The target build and, per slot, which of its stats the worn item has and which are missing |
 | `set_target_build` | Sets the target build from a PoB code or a link (pobb.in, pastebin, poe.ninja, a page with a PoB code) |
+| `get_skill_details` | All of PoB's numbers for one skill (hit, crit, speed, projectiles, area) and its supports |
+| `get_defence_details` | Every defence and recovery number, resistances and maximum hit per element |
+| `get_last_item_check` | The item last checked with the hotkey, compared with the worn gear (the app keeps it in `last-item.json` while the AI connection is on) |
+| `what_if` | Extra modifiers (e.g. "+30% to Chaos Resistance") calculated as PoB custom modifiers – DPS/EHP change, build unchanged |
+| `price_item` | poe.ninja price of an exchange item or unique, with the trade pair check |
+| `equip_item` | Equips an item in the app's copy of the build (like "Equip in my build") |
+| `list_builds` / `use_build` | Builds saved in PoB 2, and switching the app to another one |
+| `search_upgrades` | The upgrade search for up to 3 slots: best listings with price, DPS/EHP change and link |
 
 The build is the one loaded in the app – the watched PoB file is read fresh on every call, so a save in PoB is seen
 right away.

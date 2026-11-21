@@ -278,8 +278,8 @@
           <label class="check mcp-toggle"><input type="checkbox" id="mcp-on" /> <span>Allow AI assistants to read my build</span></label>
           <p class="section-hint">
             Local only (no network port). The assistant sees the build loaded here – class, level, gear with mods, skills,
-            keystone passives and the stats PoB calculates. The only thing it can change is your <b>target build</b> (e.g. from a
-            guide link you give it) – never your character, nothing in the game, no buying on the trade site.
+            keystone passives and the stats PoB calculates. It can change only things in this app – your <b>target build</b>, an item
+            <b>equipped here</b> to try it, or <b>which saved PoB build</b> is used – never your character, nothing in the game, no buying on the trade site.
           </p>
         </div>
 
@@ -306,6 +306,14 @@
             <dt>evaluate_item</dt><dd>Paste an item text: Path of Building shows how much damage and defence it would add or cost in each slot.</dd>
             <dt>get_target</dt><dd>Your target build and, slot by slot, which of its stats your gear already has and which are missing.</dd>
             <dt>set_target_build</dt><dd>Sets the target build from a PoB code or a link (pobb.in, pastebin, poe.ninja, a page with a PoB code). Shown here right away.</dd>
+            <dt>get_skill_details</dt><dd>All numbers of one skill – hit, crit, speed, projectiles, area – and its supports.</dd>
+            <dt>get_defence_details</dt><dd>Every defence and recovery number: resistances and maximum hit per element, evasion, deflection, regeneration …</dd>
+            <dt>get_last_item_check</dt><dd>The item you last checked in game with the hotkey – just ask "is this item good?".</dd>
+            <dt>what_if</dt><dd>"What would +30% chaos resistance or +1 projectile level give me?" – PoB calculates it without changing your build.</dd>
+            <dt>price_item</dt><dd>poe.ninja price of currency, runes, omens or a unique, with the check of all trade pairs.</dd>
+            <dt>equip_item</dt><dd>Equips an item in this app's copy of your build, to try several upgrades one after another. "Reset" undoes it.</dd>
+            <dt>list_builds / use_build</dt><dd>Your builds saved in Path of Building 2, and switching to another one (e.g. a bossing setup).</dd>
+            <dt>search_upgrades</dt><dd>The upgrade search: trade listings within a budget, calculated in your build, with links. Up to 3 slots per question.</dd>
           </dl>
           <p class="section-hint">Try: "Which of my items should I upgrade first?", "Is this ring better than mine?" with the item text, or "Use this guide as my target and tell me what I'm missing" with a pobb.in link.</p>
         </div>
