@@ -475,7 +475,31 @@ window.addEventListener('keydown', (e) => {
 
 // ---------- Render ----------
 
+// ---------- KI-Verbindung (optional) ----------
+
+let mcpLoaded = false;
+function renderMcp(v: BuildView) {
+  const on = !!v.settings.mcp;
+  $<HTMLInputElement>('mcp-on').checked = on;
+  const badge = $('mcp-badge');
+  badge.textContent = on ? 'on' : 'off';
+  badge.classList.toggle('on', on);
+  $('mcp-setup-card').classList.toggle('dim', !on);
+  if (!mcpLoaded) {
+    mcpLoaded = true;
+    void api.mcpSetup().then((s) => {
+      $('mcp-json').textContent = s.json;
+      $('mcp-cc').textContent = s.claudeCode;
+    });
+  }
+}
+$('mcp-on').addEventListener('change', (e) => void api.setMcp((e.target as HTMLInputElement).checked));
+for (const [btn, what] of [['mcp-copy-json', 'json'], ['mcp-copy-cc', 'claudeCode']] as const) {
+  $(btn).addEventListener('click', () => void api.copyMcp(what).then(() => message('Copied – paste it into your AI program.')));
+}
+
 function render(v: BuildView) {
+  renderMcp(v);
   if (v.build?.code !== current?.build?.code) shownSet = null;
   current = v;
   localSlots = new Set((v.build?.equips ?? []).map((e) => e.slot));

@@ -13,6 +13,10 @@ const api = {
   pasteBuild: (): Promise<Result> => ipcRenderer.invoke('build:paste'),
   /** Copies the current build code to the clipboard. */
   copyBuild: (): Promise<boolean> => ipcRenderer.invoke('build:copy'),
+  /** Optional AI connection (MCP): on/off, setup for AI programs, copy it to the clipboard (on click). */
+  setMcp: (on: boolean): Promise<Result> => ipcRenderer.invoke('mcp:set', on),
+  mcpSetup: (): Promise<import('../shared/types').McpSetup> => ipcRenderer.invoke('mcp:setup'),
+  copyMcp: (what: 'json' | 'claudeCode'): Promise<boolean> => ipcRenderer.invoke('mcp:copy', what),
   /** Undoes all "Equip in my build" changes. */
   resetEquips: (): Promise<Result> => ipcRenderer.invoke('build:reset-equips'),
   setNinjaLink: (link: string): Promise<Result> => ipcRenderer.invoke('ninja:set', link),

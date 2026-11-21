@@ -6,7 +6,7 @@ import { readItemText as readGameItemText } from '@poe2/core/clipboard';
 import { validateHotkey } from '@poe2/core/hotkey';
 import { foregroundWindowHandle } from '@poe2/core/win32';
 import { characterLink, fetchNinjaBuild, fetchNinjaIcons, parseCharacterLink } from '../shared/ninja';
-import type {
+import type { McpSetup,
   BuildSource,
   BuildView,
   Comparison,
@@ -126,7 +126,7 @@ function sanitizeSettings(v: unknown): Settings {
   const pos = s.overlayPosition as Record<string, unknown> | undefined;
   const overlayPosition =
     pos && Number.isFinite(pos.x) && Number.isFinite(pos.y) ? { x: Math.round(pos.x as number), y: Math.round(pos.y as number) } : undefined;
-  return { ninja: sanitizeNinja(s.ninja), hotkey, ...(overlayPosition ? { overlayPosition } : {}) };
+  return { ninja: sanitizeNinja(s.ninja), hotkey, ...(overlayPosition ? { overlayPosition } : {}), ...(s.mcp === true ? { mcp: true } : {}) };
 }
 
 function sanitizeTarget(v: unknown): StoredTarget | undefined {
@@ -163,7 +163,17 @@ function pobDir(): string {
   return app.isPackaged && existsSync(packaged) ? packaged : join(__dirname, '..', 'vendor', 'PathOfBuilding-PoE2');
 }
 
-const engine = new Engine(join(__dirname, 'engine.js'), pobDir());
+/** Command line an AI client uses to start the MCP server: this exe in Node mode with dist/mcp.js. */
+function mcpSetup(): McpSetup {
+  const script = app.isPackaged ? join(process.resourcesPath, 'app.asar', 'dist', 'mcp.js') : join(__dirname, 'mcp.js');
+  const command = process.execPath;
+  const env = { ELECTRON_RUN_AS_NODE: '1' };
+  const json = JSON.stringify({ mcpServers: { 'poe2-build-companion': { command, args: [script], env } } }, null, 2);
+  const q = (p: string) => `"${p}"`;
+  return { command, args: [script], env, json, claudeCode: `claude mcp add poe2-build-companion --env ELECTRON_RUN_AS_NODE=1 -- ${q(command)} ${q(script)}` };
+}
+
+const engine = new Engine(join(__dirname, 'engine.js'), pobDir(), log);
 let engineState: BuildView['engine'] = 'starting';
 let engineError: string | undefined;
 let overview: Overview | undefined;
@@ -601,6 +611,22 @@ function registerIpc() {
     saveStore();
     pushView();
     return ok();
+  });
+
+  // Optionale KI-Verbindung (MCP): an/aus, und wie ein KI-Programm den Server startet.
+  ipcMain.handle('mcp:set', (_e, on: unknown): Result => {
+    if (on === true) store.settings.mcp = true;
+    else delete store.settings.mcp;
+    saveStore();
+    pushView();
+    log(`AI connection (MCP) ${on === true ? 'on' : 'off'}`);
+    return ok();
+  });
+  ipcMain.handle('mcp:setup', () => mcpSetup());
+  ipcMain.handle('mcp:copy', (_e, what: unknown) => {
+    const s = mcpSetup();
+    clipboard.writeText(what === 'claudeCode' ? s.claudeCode : s.json);
+    return true;
   });
 
   ipcMain.handle('settings:reset-overlay', (): Result => {

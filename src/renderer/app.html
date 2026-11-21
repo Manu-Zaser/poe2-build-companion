@@ -42,6 +42,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" /><path d="M5 20h14" /></svg>
         <span>Upgrades</span>
       </button>
+      <button class="nav-item" data-page="ai">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v3M15 4v3M9 17v3M15 17v3M4 9h3M4 15h3M17 9h3M17 15h3" /><rect x="7" y="7" width="10" height="10" rx="2" /><path d="M10.5 10.5h3v3h-3z" /></svg>
+        <span>AI connection</span>
+      </button>
     </nav>
 
     <div class="sidebar-foot">
@@ -193,6 +197,48 @@
             The clipboard is read once, only when you click.
           </p>
           <div class="row"><button class="btn" id="source-paste">Paste build code</button></div>
+        </div>
+      </section>
+      <!-- KI-VERBINDUNG (optional) -->
+      <section class="page" data-page="ai" data-title="AI connection" data-sub="Optional: let an AI assistant read your build (MCP)">
+        <div class="card pad">
+          <div class="card-head"><h2>AI connection (MCP)</h2><span class="badge" id="mcp-badge">off</span></div>
+          <p class="text">
+            Lets an AI assistant on this computer – Claude Desktop, Claude Code, Codex CLI, Gemini CLI, VS Code and others that
+            support <b>MCP</b> – read your character and ask Path of Building how an item would change your damage and defences.
+            Completely optional: as long as this is off, the assistant gets nothing.
+          </p>
+          <label class="check mcp-toggle"><input type="checkbox" id="mcp-on" /> <span>Allow AI assistants to read my build</span></label>
+          <p class="section-hint">
+            Local only (no network port), read-only: the assistant cannot change your build, send anything to the game or buy
+            on the trade site. It sees the build loaded here – class, level, gear with mods, skills, keystone passives and the
+            stats PoB calculates.
+          </p>
+        </div>
+
+        <div class="card pad" id="mcp-setup-card">
+          <div class="card-head"><h2>Set it up in your AI program</h2></div>
+          <p class="text">
+            Add this server to your AI program once. <b>Claude Desktop:</b> Settings → Developer → Edit config, paste it into
+            <code>claude_desktop_config.json</code> and restart Claude. <b>Other programs</b> (Cursor, VS Code, LM Studio …) use the same
+            <code>mcpServers</code> entry in their MCP settings.
+          </p>
+          <pre class="mcp-code" id="mcp-json"></pre>
+          <div class="row"><button class="btn sm" id="mcp-copy-json">Copy</button><span class="card-note" id="mcp-copied"></span></div>
+          <p class="text"><b>Claude Code:</b> run this once in a terminal:</p>
+          <pre class="mcp-code" id="mcp-cc"></pre>
+          <div class="row"><button class="btn sm" id="mcp-copy-cc">Copy</button></div>
+          <p class="section-hint">The paths point to this copy of the app – after moving or reinstalling it, copy the entry again.</p>
+        </div>
+
+        <div class="card pad">
+          <div class="card-head"><h2>What the assistant can ask</h2></div>
+          <dl class="mcp-tools">
+            <dt>get_character</dt><dd>Class, ascendancy, level, main skill, every equipped item with mods, jewels, skill gems, keystones.</dd>
+            <dt>get_stats</dt><dd>Life, energy shield, spirit, evasion, resistances, maximum hits, attributes, DPS – calculated by Path of Building.</dd>
+            <dt>evaluate_item</dt><dd>Paste an item text: Path of Building shows how much damage and defence it would add or cost in each slot.</dd>
+          </dl>
+          <p class="section-hint">Try: "Which of my items should I upgrade first?" or "Is this ring better than mine?" with the item text.</p>
         </div>
       </section>
       <!-- TARGET BUILD -->

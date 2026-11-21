@@ -1,6 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { log } from './log';
 
 /**
  * Client for the calculation engine (dist/engine.js): a long-running child process that hosts
@@ -16,6 +15,8 @@ export class Engine {
   constructor(
     private readonly script: string,
     private readonly pobDir: string,
+    /** Where messages go (the app's log file; the MCP server writes to stderr). */
+    private readonly log: (message: string) => void = () => undefined,
   ) {}
 
   /** Starts the engine (once). Resolves when PoB has finished loading. */
@@ -43,13 +44,13 @@ export class Engine {
         try {
           msg = JSON.parse(line);
         } catch {
-          log(`engine: unexpected output ${line.slice(0, 200)}`);
+          this.log(`engine: unexpected output ${line.slice(0, 200)}`);
           return;
         }
         if (!ready) {
           if (msg.ready) {
             ready = true;
-            log(`engine: ready in ${msg.startupMs} ms`);
+            this.log(`engine: ready in ${msg.startupMs} ms`);
             resolve();
           } else {
             reject(new Error(msg.fatal ?? 'The calculation engine did not start.'));
@@ -69,11 +70,11 @@ export class Engine {
       });
 
       child.on('error', (err) => {
-        log(`engine: spawn error ${err.message}`);
+        this.log(`engine: spawn error ${err.message}`);
         if (!ready) reject(err);
       });
       child.on('exit', (code) => {
-        log(`engine: exited with ${code}\n${this.stderrTail.join('').slice(-2000)}`);
+        this.log(`engine: exited with ${code}\n${this.stderrTail.join('').slice(-2000)}`);
         const err = new Error('The calculation engine stopped unexpectedly.');
         if (!ready) reject(err);
         for (const p of this.pending.values()) {

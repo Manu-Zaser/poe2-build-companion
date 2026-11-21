@@ -410,3 +410,14 @@ h3 { margin: 0 0 8px; font: 600 11px var(--font-display); letter-spacing: .1em; 
 .up-links .btn { text-decoration: none; }
 .up-weighted { color: var(--gold-bright); border-color: var(--gold-deep); background: rgba(201,168,92,.08); }
 .up-weighted:hover { color: var(--gold-bright); background: rgba(201,168,92,.16); }
+
+/* ---------- KI-Verbindung ---------- */
+.mcp-toggle { margin: 12px 0 4px; }
+.mcp-code { margin: 10px 0 8px; padding: 10px 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font: 12px ui-monospace, Consolas, monospace; color: var(--text); white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; user-select: text; }
+#mcp-setup-card.dim { opacity: .55; }
+.badge.on { color: #b5d3a6; border-color: rgba(127,176,105,.45); }
+.mcp-tools { margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: 8px 14px; font-size: 13px; }
+.mcp-tools dt { font: 600 12.5px ui-monospace, Consolas, monospace; color: var(--gold-bright); }
+.mcp-tools dd { margin: 0; color: var(--muted); }
+.check { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; }
+.check input { width: 16px; height: 16px; accent-color: var(--gold); cursor: pointer; margin: 0; }

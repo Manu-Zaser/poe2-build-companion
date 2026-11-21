@@ -44,6 +44,26 @@ prices with its own exchange rate. The search waits for the trade site's rate
 limits and stops (keeping what it found) if a limit would be exceeded. Prices are converted with poe.ninja's
 exchange rates.
 
+## AI connection (MCP, optional)
+
+An AI assistant on the same computer (Claude Desktop, Claude Code, Codex CLI, Gemini CLI, VS Code, LM Studio … – anything
+that speaks MCP) can read the build and let Path of Building calculate items. **Off by default**: turn it on under
+*AI connection* ("Allow AI assistants to read my build"); while it is off, every call answers that it is off.
+
+The page shows the entry to add to the AI program (`mcpServers` JSON and a `claude mcp add …` line) with Copy buttons.
+The AI program starts the server itself: this app's exe in Node mode (`ELECTRON_RUN_AS_NODE=1`) with `dist/mcp.js` –
+the app does not need to be open. Local only (stdio, no network port), read-only, no login; nothing is sent to the
+game or the trade site.
+
+| Tool | Returns |
+|---|---|
+| `get_character` | Class, ascendancy, level, main skill, equipped items with mods, jewels, skill gems, keystones |
+| `get_stats` | Life, ES, mana, spirit, evasion, resistances, maximum hits, EHP, attributes, DPS of the strongest skills |
+| `evaluate_item` | For an item text: DPS and EHP change in % per slot it fits, and the changed stats |
+
+The build is the one loaded in the app – the watched PoB file is read fresh on every call, so a save in PoB is seen
+right away.
+
 ## Target build (phase 3)
 
 On the *Target build* page, set the build you follow – paste its Path of Building code (e.g. from a guide) or use a
@@ -158,6 +178,8 @@ src/shared/                  Build code decoding, poe.ninja lookup, verdict and 
                              (targets.ts), trade listing → PoB item text (tradeitem.ts), upgrade search query and
                              ranking (upgrades.ts), types
 src/renderer/                Character, build source and item check pages; overlay
+src/mcp/                     Optional MCP server for AI assistants: protocol.ts (JSON-RPC over stdio, no
+                             dependency), tools.ts (what the AI sees), server.ts (build loading, engine)
 ../core (@poe2/core)         Shared with Price Check: hotkey helpers, one copy keystroke (Ctrl+Alt+C) and window
                              focus, reading the item text, log file, trade client, poe.ninja exchange rates
 ```

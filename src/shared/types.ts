@@ -167,6 +167,19 @@ export interface Settings {
   hotkey: string;
   /** Where the user left the overlay. */
   overlayPosition?: { x: number; y: number };
+  /** Optional AI connection: the MCP server (dist/mcp.js) answers only while this is on. */
+  mcp?: boolean;
+}
+
+/** How an AI client starts the MCP server (shown on the "AI connection" page). */
+export interface McpSetup {
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  /** Ready to paste into claude_desktop_config.json, .mcp.json and similar files. */
+  json: string;
+  /** One line for Claude Code. */
+  claudeCode: string;
 }
 
 export interface StoredState {
